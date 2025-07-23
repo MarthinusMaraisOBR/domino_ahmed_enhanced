@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Ahmed Body DoMINO Model - Simple Force R² Analysis
-Creates scatter plots of predicted vs true forces with R² calculations
-Uses only standard libraries (numpy, matplotlib, scipy)
+Ahmed Body DoMINO Model - Separate Drag and Lift Force R² Plots
+Creates two individual PNG files: one for drag, one for lift
 """
 
 import numpy as np
@@ -36,12 +35,10 @@ def calculate_r2_score(y_true, y_pred):
     
     return r2
 
-def extract_force_data_from_test_results():
+def extract_force_data():
     """
-    Extract force data from your test results output.
-    This data is from your actual test.py execution.
+    Extract force data from your test results.
     """
-    # Force data extracted from your test results
     force_data = {
         471: {'drag_pred': 0.014622377, 'drag_true': 0.019690385, 'lift_pred': 0.013706224, 'lift_true': 0.017482838},
         451: {'drag_pred': 0.015251859, 'drag_true': 0.020506265, 'lift_pred': -0.0050089946, 'lift_true': -0.008251523},
@@ -97,226 +94,169 @@ def extract_force_data_from_test_results():
     
     return force_data
 
-def calculate_r2_and_stats(y_true, y_pred):
+def create_drag_force_plot(drag_true, drag_pred, save_path="/data/ahmed_data/analysis/"):
     """
-    Calculate R², RMSE, MAE, and other statistics.
+    Create drag force R² plot and save as PNG.
     """
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
-    
-    # R² calculation
-    r2 = calculate_r2_score(y_true, y_pred)
-    
-    # Calculate additional statistics
-    rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
-    mae = np.mean(np.abs(y_true - y_pred))
-    
-    # Pearson correlation coefficient
-    corr_coef, p_value = stats.pearsonr(y_true, y_pred)
-    
-    # Mean percentage error (handle divide by zero)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        percentage_errors = np.abs((y_true - y_pred) / y_true) * 100
-        percentage_errors = percentage_errors[np.isfinite(percentage_errors)]  # Remove inf/nan
-        mpe = np.mean(percentage_errors) if len(percentage_errors) > 0 else 0
-    
-    return {
-        'r2': r2,
-        'rmse': rmse,
-        'mae': mae,
-        'correlation': corr_coef,
-        'p_value': p_value,
-        'mpe': mpe
-    }
-
-def create_combined_force_plot(force_data, save_path="/data/ahmed_data/analysis/"):
-    """
-    Create a combined plot with all forces (like the one you showed).
-    """
-    # Extract data arrays
-    drag_true = np.array([data['drag_true'] for data in force_data.values()])
-    drag_pred = np.array([data['drag_pred'] for data in force_data.values()])
-    lift_true = np.array([data['lift_true'] for data in force_data.values()])
-    lift_pred = np.array([data['lift_pred'] for data in force_data.values()])
-    
-    # Combine all forces
-    all_true = np.concatenate([drag_true, lift_true])
-    all_pred = np.concatenate([drag_pred, lift_pred])
-    
-    # Calculate combined R²
-    combined_stats = calculate_r2_and_stats(all_true, all_pred)
+    # Calculate R² and statistics
+    r2 = calculate_r2_score(drag_true, drag_pred)
+    rmse = np.sqrt(np.mean((drag_true - drag_pred) ** 2))
+    mae = np.mean(np.abs(drag_true - drag_pred))
+    corr_coef, _ = stats.pearsonr(drag_true, drag_pred)
     
     # Create figure
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
     
-    # Plot points
-    ax.scatter(drag_true, drag_pred, c='#2E86AB', s=80, alpha=0.7, edgecolors='white', 
-               linewidth=1, label=f'Drag Forces (n={len(drag_true)})')
-    ax.scatter(lift_true, lift_pred, c='#A23B72', s=80, alpha=0.7, edgecolors='white', 
-               linewidth=1, label=f'Lift Forces (n={len(lift_true)})')
+    # Plot scatter points
+    ax.scatter(drag_true, drag_pred, c='#1f77b4', s=100, alpha=0.7, 
+               edgecolors='white', linewidth=1.5)
     
     # Perfect prediction line (1:1 line)
-    force_min = min(all_true.min(), all_pred.min())
-    force_max = max(all_true.max(), all_pred.max())
-    ax.plot([force_min, force_max], [force_min, force_max], 'k--', linewidth=2, alpha=0.8, 
-            label='Perfect Prediction (1:1)')
+    drag_min = min(drag_true.min(), drag_pred.min())
+    drag_max = max(drag_true.max(), drag_pred.max())
+    ax.plot([drag_min, drag_max], [drag_min, drag_max], 'k--', 
+            linewidth=2, alpha=0.8, label='Perfect Prediction (1:1)')
     
-    # Best fit line for all data
-    z = np.polyfit(all_true, all_pred, 1)
+    # Best fit line
+    z = np.polyfit(drag_true, drag_pred, 1)
     p = np.poly1d(z)
-    ax.plot(all_true, p(all_true), 'r-', linewidth=2, alpha=0.8, 
+    ax.plot(drag_true, p(drag_true), 'r-', linewidth=2, alpha=0.8, 
             label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
     
-    ax.set_xlabel('Force (True)', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Force (Predicted)', fontsize=14, fontweight='bold')
-    ax.set_title(f'Forces. R2: {combined_stats["r2"]:.4f}', 
-                fontsize=16, fontweight='bold', pad=20)
+    # Labels and title
+    ax.set_xlabel('Drag Force (True)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('Drag Force (Predicted)', fontsize=16, fontweight='bold')
+    ax.set_title(f'Drag Force Prediction\nR² = {r2:.4f}', 
+                fontsize=18, fontweight='bold', pad=20)
+    
+    # Styling
     ax.grid(True, alpha=0.3)
-    ax.legend(frameon=True, fancybox=True, shadow=True, loc='upper left')
+    ax.legend(fontsize=12, frameon=True, fancybox=True, shadow=True)
     
-    # Add statistics text box
+    # Statistics text box
     stats_text = f"""Statistics:
-R² = {combined_stats['r2']:.4f}
-RMSE = {combined_stats['rmse']:.6f}
-MAE = {combined_stats['mae']:.6f}
-MPE = {combined_stats['mpe']:.1f}%
-Points = {len(all_true)}"""
+R² = {r2:.4f}
+RMSE = {rmse:.6f}
+MAE = {mae:.6f}
+Correlation = {corr_coef:.4f}
+n = {len(drag_true)}"""
     
-    ax.text(0.95, 0.05, stats_text, transform=ax.transAxes, fontsize=11,
-            verticalalignment='bottom', horizontalalignment='right',
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
+    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=12,
+            verticalalignment='top', bbox=dict(boxstyle='round', 
+            facecolor='white', alpha=0.9, edgecolor='gray'))
     
+    # Adjust layout and save
     plt.tight_layout()
     
-    # Save the plot
     os.makedirs(save_path, exist_ok=True)
-    plot_file = os.path.join(save_path, "ahmed_combined_force_r2.png")
-    plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
-    print(f"📊 Combined R² plot saved to: {plot_file}")
+    drag_file = os.path.join(save_path, "ahmed_drag_force_r2.png")
+    plt.savefig(drag_file, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()  # Close to free memory
     
-    plt.show()
-    
-    return combined_stats
+    return drag_file, r2
 
-def create_individual_force_plots(force_data, save_path="/data/ahmed_data/analysis/"):
+def create_lift_force_plot(lift_true, lift_pred, save_path="/data/ahmed_data/analysis/"):
     """
-    Create individual plots for drag and lift forces.
+    Create lift force R² plot and save as PNG.
     """
-    # Extract data arrays
+    # Calculate R² and statistics
+    r2 = calculate_r2_score(lift_true, lift_pred)
+    rmse = np.sqrt(np.mean((lift_true - lift_pred) ** 2))
+    mae = np.mean(np.abs(lift_true - lift_pred))
+    corr_coef, _ = stats.pearsonr(lift_true, lift_pred)
+    
+    # Create figure
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    
+    # Plot scatter points
+    ax.scatter(lift_true, lift_pred, c='#ff7f0e', s=100, alpha=0.7, 
+               edgecolors='white', linewidth=1.5)
+    
+    # Perfect prediction line (1:1 line)
+    lift_min = min(lift_true.min(), lift_pred.min())
+    lift_max = max(lift_true.max(), lift_pred.max())
+    ax.plot([lift_min, lift_max], [lift_min, lift_max], 'k--', 
+            linewidth=2, alpha=0.8, label='Perfect Prediction (1:1)')
+    
+    # Best fit line
+    z = np.polyfit(lift_true, lift_pred, 1)
+    p = np.poly1d(z)
+    ax.plot(lift_true, p(lift_true), 'r-', linewidth=2, alpha=0.8, 
+            label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
+    
+    # Labels and title
+    ax.set_xlabel('Lift Force (True)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('Lift Force (Predicted)', fontsize=16, fontweight='bold')
+    ax.set_title(f'Lift Force Prediction\nR² = {r2:.4f}', 
+                fontsize=18, fontweight='bold', pad=20)
+    
+    # Styling
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=12, frameon=True, fancybox=True, shadow=True)
+    
+    # Statistics text box
+    stats_text = f"""Statistics:
+R² = {r2:.4f}
+RMSE = {rmse:.6f}
+MAE = {mae:.6f}
+Correlation = {corr_coef:.4f}
+n = {len(lift_true)}"""
+    
+    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=12,
+            verticalalignment='top', bbox=dict(boxstyle='round', 
+            facecolor='white', alpha=0.9, edgecolor='gray'))
+    
+    # Adjust layout and save
+    plt.tight_layout()
+    
+    os.makedirs(save_path, exist_ok=True)
+    lift_file = os.path.join(save_path, "ahmed_lift_force_r2.png")
+    plt.savefig(lift_file, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()  # Close to free memory
+    
+    return lift_file, r2
+
+def main():
+    """
+    Main function to create separate drag and lift force R² plots.
+    """
+    print("🚀 CREATING SEPARATE DRAG AND LIFT FORCE R² PLOTS")
+    print("="*60)
+    
+    # Extract force data
+    force_data = extract_force_data()
+    print(f"📊 Loaded force data for {len(force_data)} test cases")
+    
+    # Extract arrays
     drag_true = np.array([data['drag_true'] for data in force_data.values()])
     drag_pred = np.array([data['drag_pred'] for data in force_data.values()])
     lift_true = np.array([data['lift_true'] for data in force_data.values()])
     lift_pred = np.array([data['lift_pred'] for data in force_data.values()])
     
-    # Calculate statistics
-    drag_stats = calculate_r2_and_stats(drag_true, drag_pred)
-    lift_stats = calculate_r2_and_stats(lift_true, lift_pred)
+    print(f"📈 Drag force range: {drag_true.min():.6f} to {drag_true.max():.6f}")
+    print(f"📈 Lift force range: {lift_true.min():.6f} to {lift_true.max():.6f}")
     
-    # Create figure with subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    # Create drag force plot
+    print("\n🎯 Creating drag force R² plot...")
+    drag_file, drag_r2 = create_drag_force_plot(drag_true, drag_pred)
+    print(f"✅ Drag plot saved: {drag_file}")
+    print(f"   Drag R² = {drag_r2:.4f}")
     
-    # Colors and styling
-    drag_color = '#2E86AB'
-    lift_color = '#A23B72'
-    point_size = 80
-    alpha = 0.7
+    # Create lift force plot
+    print("\n🎯 Creating lift force R² plot...")
+    lift_file, lift_r2 = create_lift_force_plot(lift_true, lift_pred)
+    print(f"✅ Lift plot saved: {lift_file}")
+    print(f"   Lift R² = {lift_r2:.4f}")
     
-    # Drag Force Plot
-    ax1.scatter(drag_true, drag_pred, c=drag_color, s=point_size, alpha=alpha, edgecolors='white', linewidth=1)
-    
-    # Perfect prediction line (1:1 line)
-    drag_min, drag_max = min(drag_true.min(), drag_pred.min()), max(drag_true.max(), drag_pred.max())
-    ax1.plot([drag_min, drag_max], [drag_min, drag_max], 'k--', linewidth=2, alpha=0.8, label='Perfect Prediction')
-    
-    # Best fit line
-    z = np.polyfit(drag_true, drag_pred, 1)
-    p = np.poly1d(z)
-    ax1.plot(drag_true, p(drag_true), color=drag_color, linewidth=2, alpha=0.8, 
-             label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
-    
-    ax1.set_xlabel('Drag Force (True)', fontsize=14, fontweight='bold')
-    ax1.set_ylabel('Drag Force (Predicted)', fontsize=14, fontweight='bold')
-    ax1.set_title(f'Drag Force Prediction\nR² = {drag_stats["r2"]:.4f}', fontsize=16, fontweight='bold', pad=20)
-    ax1.grid(True, alpha=0.3)
-    ax1.legend(frameon=True, fancybox=True, shadow=True)
-    
-    # Add statistics text box
-    drag_stats_text = f"""Statistics:
-R² = {drag_stats['r2']:.4f}
-RMSE = {drag_stats['rmse']:.6f}
-MAE = {drag_stats['mae']:.6f}
-MPE = {drag_stats['mpe']:.1f}%"""
-    
-    ax1.text(0.05, 0.95, drag_stats_text, transform=ax1.transAxes, fontsize=10,
-             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    
-    # Lift Force Plot
-    ax2.scatter(lift_true, lift_pred, c=lift_color, s=point_size, alpha=alpha, edgecolors='white', linewidth=1)
-    
-    # Perfect prediction line (1:1 line)
-    lift_min, lift_max = min(lift_true.min(), lift_pred.min()), max(lift_true.max(), lift_pred.max())
-    ax2.plot([lift_min, lift_max], [lift_min, lift_max], 'k--', linewidth=2, alpha=0.8, label='Perfect Prediction')
-    
-    # Best fit line
-    z = np.polyfit(lift_true, lift_pred, 1)
-    p = np.poly1d(z)
-    ax2.plot(lift_true, p(lift_true), color=lift_color, linewidth=2, alpha=0.8, 
-             label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
-    
-    ax2.set_xlabel('Lift Force (True)', fontsize=14, fontweight='bold')
-    ax2.set_ylabel('Lift Force (Predicted)', fontsize=14, fontweight='bold')
-    ax2.set_title(f'Lift Force Prediction\nR² = {lift_stats["r2"]:.4f}', fontsize=16, fontweight='bold', pad=20)
-    ax2.grid(True, alpha=0.3)
-    ax2.legend(frameon=True, fancybox=True, shadow=True)
-    
-    # Add statistics text box
-    lift_stats_text = f"""Statistics:
-R² = {lift_stats['r2']:.4f}
-RMSE = {lift_stats['rmse']:.6f}
-MAE = {lift_stats['mae']:.6f}
-MPE = {lift_stats['mpe']:.1f}%"""
-    
-    ax2.text(0.05, 0.95, lift_stats_text, transform=ax2.transAxes, fontsize=10,
-             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    
-    plt.tight_layout()
-    
-    # Save the plot
-    os.makedirs(save_path, exist_ok=True)
-    plot_file = os.path.join(save_path, "ahmed_individual_force_r2.png")
-    plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
-    print(f"📊 Individual R² plots saved to: {plot_file}")
-    
-    plt.show()
-    
-    return drag_stats, lift_stats
-
-def print_summary_results(drag_stats, lift_stats, combined_stats):
-    """
-    Print a comprehensive summary of the R² analysis.
-    """
-    print("\n" + "="*80)
-    print("AHMED BODY DoMINO MODEL - FORCE PREDICTION R² ANALYSIS")
-    print("="*80)
-    print("Model: 500-epoch trained DoMINO (surface-only)")
-    print("Test Cases: 50 (run_451 to run_500)")
-    print("="*80)
-    
-    print(f"\n🎯 FORCE PREDICTION ACCURACY:")
-    print("─"*60)
-    print(f"{'METRIC':<20} {'DRAG':<12} {'LIFT':<12} {'COMBINED':<12}")
-    print("─"*60)
-    print(f"{'R² Score':<20} {drag_stats['r2']:<12.4f} {lift_stats['r2']:<12.4f} {combined_stats['r2']:<12.4f}")
-    print(f"{'RMSE':<20} {drag_stats['rmse']:<12.6f} {lift_stats['rmse']:<12.6f} {combined_stats['rmse']:<12.6f}")
-    print(f"{'MAE':<20} {drag_stats['mae']:<12.6f} {lift_stats['mae']:<12.6f} {combined_stats['mae']:<12.6f}")
-    print(f"{'Mean % Error':<20} {drag_stats['mpe']:<12.1f} {lift_stats['mpe']:<12.1f} {combined_stats['mpe']:<12.1f}")
-    print(f"{'Correlation':<20} {drag_stats['correlation']:<12.4f} {lift_stats['correlation']:<12.4f} {combined_stats['correlation']:<12.4f}")
-    print("─"*60)
+    # Summary
+    print("\n" + "="*60)
+    print("📊 SUMMARY OF R² ANALYSIS")
+    print("="*60)
+    print(f"Drag Force R²: {drag_r2:.4f}")
+    print(f"Lift Force R²: {lift_r2:.4f}")
+    print(f"Combined Average: {(drag_r2 + lift_r2)/2:.4f}")
     
     # Performance assessment
-    print(f"\n🏆 PERFORMANCE ASSESSMENT:")
-    print("─"*40)
-    
     def assess_r2(r2_value):
         if r2_value >= 0.95:
             return "🎉 OUTSTANDING"
@@ -329,50 +269,14 @@ def print_summary_results(drag_stats, lift_stats, combined_stats):
         else:
             return "⚠️ NEEDS IMPROVEMENT"
     
-    print(f"Drag Force R²: {assess_r2(drag_stats['r2'])} ({drag_stats['r2']:.4f})")
-    print(f"Lift Force R²: {assess_r2(lift_stats['r2'])} ({lift_stats['r2']:.4f})")
-    print(f"Combined R²: {assess_r2(combined_stats['r2'])} ({combined_stats['r2']:.4f})")
+    print(f"\nDrag Performance: {assess_r2(drag_r2)}")
+    print(f"Lift Performance: {assess_r2(lift_r2)}")
     
-    # DoMINO paper comparison
-    domino_paper_r2 = 0.96  # Typical reported R² for DoMINO paper
-    print(f"\n📋 COMPARISON TO DOMINO PAPER:")
-    print("─"*40)
-    print(f"Your Combined R²: {combined_stats['r2']:.4f}")
-    print(f"DoMINO Paper R²: ~{domino_paper_r2:.2f}")
-    
-    if combined_stats['r2'] >= domino_paper_r2:
-        print("🏆 Your model MATCHES/EXCEEDS published performance!")
-    elif combined_stats['r2'] >= domino_paper_r2 - 0.02:
-        print("✅ Your model shows EXCELLENT performance!")
-    else:
-        print("👍 Your model shows GOOD performance!")
-    
-    print("="*80)
-
-def main():
-    """
-    Main function to run the complete R² analysis.
-    """
-    print("🚀 AHMED BODY DoMINO FORCE R² ANALYSIS")
-    print("="*50)
-    
-    # Extract force data from test results
-    force_data = extract_force_data_from_test_results()
-    print(f"📊 Loaded force data for {len(force_data)} test cases")
-    
-    # Create combined force plot (like the one you showed)
-    print("\n📈 Creating combined force R² plot...")
-    combined_stats = create_combined_force_plot(force_data)
-    
-    # Create individual drag/lift plots
-    print("\n📈 Creating individual force R² plots...")
-    drag_stats, lift_stats = create_individual_force_plots(force_data)
-    
-    # Print comprehensive results
-    print_summary_results(drag_stats, lift_stats, combined_stats)
-    
-    print(f"\n🎉 R² analysis complete!")
-    print("="*50)
+    print("\n📁 OUTPUT FILES:")
+    print(f"   1. {drag_file}")
+    print(f"   2. {lift_file}")
+    print("\n🎉 Analysis complete!")
+    print("="*60)
 
 if __name__ == "__main__":
     main()
