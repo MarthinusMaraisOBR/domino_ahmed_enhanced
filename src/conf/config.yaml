@@ -211,7 +211,7 @@ val: # Validation configurable parameters
 eval: # Testing configurable parameters
   test_path: /data/ahmed_data/ahmed_data/raw_test/  # ← Only runs 451-500
   save_path: /data/ahmed_data/predictions/  # FIXED NVIDIA Guideline 17
-  checkpoint_name: DoMINO_Ahmed.pt  # FIXED NVIDIA Guideline 18
+  checkpoint_name: DoMINO.0.499.pt
   scaling_param_path: outputs/Ahmed_Dataset/scaling_params  # FIXED NVIDIA Guideline 19
   refine_stl: False # Automatically refine STL during inference
   stencil_size: 7 # Stencil size for evaluating surface and volume model
