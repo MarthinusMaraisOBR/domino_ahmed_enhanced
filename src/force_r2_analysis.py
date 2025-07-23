@@ -1,23 +1,40 @@
 #!/usr/bin/env python3
 """
-Ahmed Body DoMINO Model - Force Prediction R² Analysis
+Ahmed Body DoMINO Model - Simple Force R² Analysis
 Creates scatter plots of predicted vs true forces with R² calculations
-
-This script analyzes the aerodynamic force prediction accuracy of your 500-epoch
-DoMINO model and creates publication-quality R² plots.
+Uses only standard libraries (numpy, matplotlib, scipy)
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import r2_score
-import pandas as pd
 from scipy import stats
 import os
 
 # Set plotting style
-plt.style.use('seaborn-v0_8-whitegrid')
-sns.set_palette("husl")
+plt.style.use('default')
+plt.rcParams['figure.facecolor'] = 'white'
+plt.rcParams['axes.facecolor'] = 'white'
+plt.rcParams['axes.grid'] = True
+plt.rcParams['grid.alpha'] = 0.3
+
+def calculate_r2_score(y_true, y_pred):
+    """
+    Calculate R² score manually (coefficient of determination).
+    R² = 1 - (SS_res / SS_tot)
+    """
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
+    # Total sum of squares
+    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+    
+    # Residual sum of squares
+    ss_res = np.sum((y_true - y_pred) ** 2)
+    
+    # R² calculation
+    r2 = 1 - (ss_res / ss_tot)
+    
+    return r2
 
 def extract_force_data_from_test_results():
     """
@@ -25,7 +42,6 @@ def extract_force_data_from_test_results():
     This data is from your actual test.py execution.
     """
     # Force data extracted from your test results
-    # Format: case_number: {'drag_pred': value, 'drag_true': value, 'lift_pred': value, 'lift_true': value}
     force_data = {
         471: {'drag_pred': 0.014622377, 'drag_true': 0.019690385, 'lift_pred': 0.013706224, 'lift_true': 0.017482838},
         451: {'drag_pred': 0.015251859, 'drag_true': 0.020506265, 'lift_pred': -0.0050089946, 'lift_true': -0.008251523},
@@ -85,7 +101,11 @@ def calculate_r2_and_stats(y_true, y_pred):
     """
     Calculate R², RMSE, MAE, and other statistics.
     """
-    r2 = r2_score(y_true, y_pred)
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
+    # R² calculation
+    r2 = calculate_r2_score(y_true, y_pred)
     
     # Calculate additional statistics
     rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
@@ -94,8 +114,11 @@ def calculate_r2_and_stats(y_true, y_pred):
     # Pearson correlation coefficient
     corr_coef, p_value = stats.pearsonr(y_true, y_pred)
     
-    # Mean percentage error
-    mpe = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    # Mean percentage error (handle divide by zero)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        percentage_errors = np.abs((y_true - y_pred) / y_true) * 100
+        percentage_errors = percentage_errors[np.isfinite(percentage_errors)]  # Remove inf/nan
+        mpe = np.mean(percentage_errors) if len(percentage_errors) > 0 else 0
     
     return {
         'r2': r2,
@@ -106,9 +129,78 @@ def calculate_r2_and_stats(y_true, y_pred):
         'mpe': mpe
     }
 
-def create_force_r2_plot(force_data, save_path="/data/ahmed_data/analysis/"):
+def create_combined_force_plot(force_data, save_path="/data/ahmed_data/analysis/"):
     """
-    Create R² scatter plots for drag and lift forces.
+    Create a combined plot with all forces (like the one you showed).
+    """
+    # Extract data arrays
+    drag_true = np.array([data['drag_true'] for data in force_data.values()])
+    drag_pred = np.array([data['drag_pred'] for data in force_data.values()])
+    lift_true = np.array([data['lift_true'] for data in force_data.values()])
+    lift_pred = np.array([data['lift_pred'] for data in force_data.values()])
+    
+    # Combine all forces
+    all_true = np.concatenate([drag_true, lift_true])
+    all_pred = np.concatenate([drag_pred, lift_pred])
+    
+    # Calculate combined R²
+    combined_stats = calculate_r2_and_stats(all_true, all_pred)
+    
+    # Create figure
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    
+    # Plot points
+    ax.scatter(drag_true, drag_pred, c='#2E86AB', s=80, alpha=0.7, edgecolors='white', 
+               linewidth=1, label=f'Drag Forces (n={len(drag_true)})')
+    ax.scatter(lift_true, lift_pred, c='#A23B72', s=80, alpha=0.7, edgecolors='white', 
+               linewidth=1, label=f'Lift Forces (n={len(lift_true)})')
+    
+    # Perfect prediction line (1:1 line)
+    force_min = min(all_true.min(), all_pred.min())
+    force_max = max(all_true.max(), all_pred.max())
+    ax.plot([force_min, force_max], [force_min, force_max], 'k--', linewidth=2, alpha=0.8, 
+            label='Perfect Prediction (1:1)')
+    
+    # Best fit line for all data
+    z = np.polyfit(all_true, all_pred, 1)
+    p = np.poly1d(z)
+    ax.plot(all_true, p(all_true), 'r-', linewidth=2, alpha=0.8, 
+            label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
+    
+    ax.set_xlabel('Force (True)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Force (Predicted)', fontsize=14, fontweight='bold')
+    ax.set_title(f'Forces. R2: {combined_stats["r2"]:.4f}', 
+                fontsize=16, fontweight='bold', pad=20)
+    ax.grid(True, alpha=0.3)
+    ax.legend(frameon=True, fancybox=True, shadow=True, loc='upper left')
+    
+    # Add statistics text box
+    stats_text = f"""Statistics:
+R² = {combined_stats['r2']:.4f}
+RMSE = {combined_stats['rmse']:.6f}
+MAE = {combined_stats['mae']:.6f}
+MPE = {combined_stats['mpe']:.1f}%
+Points = {len(all_true)}"""
+    
+    ax.text(0.95, 0.05, stats_text, transform=ax.transAxes, fontsize=11,
+            verticalalignment='bottom', horizontalalignment='right',
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    os.makedirs(save_path, exist_ok=True)
+    plot_file = os.path.join(save_path, "ahmed_combined_force_r2.png")
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
+    print(f"📊 Combined R² plot saved to: {plot_file}")
+    
+    plt.show()
+    
+    return combined_stats
+
+def create_individual_force_plots(force_data, save_path="/data/ahmed_data/analysis/"):
+    """
+    Create individual plots for drag and lift forces.
     """
     # Extract data arrays
     drag_true = np.array([data['drag_true'] for data in force_data.values()])
@@ -139,7 +231,8 @@ def create_force_r2_plot(force_data, save_path="/data/ahmed_data/analysis/"):
     # Best fit line
     z = np.polyfit(drag_true, drag_pred, 1)
     p = np.poly1d(z)
-    ax1.plot(drag_true, p(drag_true), color=drag_color, linewidth=2, alpha=0.8, label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
+    ax1.plot(drag_true, p(drag_true), color=drag_color, linewidth=2, alpha=0.8, 
+             label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
     
     ax1.set_xlabel('Drag Force (True)', fontsize=14, fontweight='bold')
     ax1.set_ylabel('Drag Force (Predicted)', fontsize=14, fontweight='bold')
@@ -149,11 +242,10 @@ def create_force_r2_plot(force_data, save_path="/data/ahmed_data/analysis/"):
     
     # Add statistics text box
     drag_stats_text = f"""Statistics:
-    R² = {drag_stats['r2']:.4f}
-    RMSE = {drag_stats['rmse']:.6f}
-    MAE = {drag_stats['mae']:.6f}
-    MPE = {drag_stats['mpe']:.1f}%
-    Correlation = {drag_stats['correlation']:.4f}"""
+R² = {drag_stats['r2']:.4f}
+RMSE = {drag_stats['rmse']:.6f}
+MAE = {drag_stats['mae']:.6f}
+MPE = {drag_stats['mpe']:.1f}%"""
     
     ax1.text(0.05, 0.95, drag_stats_text, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
@@ -168,7 +260,8 @@ def create_force_r2_plot(force_data, save_path="/data/ahmed_data/analysis/"):
     # Best fit line
     z = np.polyfit(lift_true, lift_pred, 1)
     p = np.poly1d(z)
-    ax2.plot(lift_true, p(lift_true), color=lift_color, linewidth=2, alpha=0.8, label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
+    ax2.plot(lift_true, p(lift_true), color=lift_color, linewidth=2, alpha=0.8, 
+             label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
     
     ax2.set_xlabel('Lift Force (True)', fontsize=14, fontweight='bold')
     ax2.set_ylabel('Lift Force (Predicted)', fontsize=14, fontweight='bold')
@@ -178,11 +271,10 @@ def create_force_r2_plot(force_data, save_path="/data/ahmed_data/analysis/"):
     
     # Add statistics text box
     lift_stats_text = f"""Statistics:
-    R² = {lift_stats['r2']:.4f}
-    RMSE = {lift_stats['rmse']:.6f}
-    MAE = {lift_stats['mae']:.6f}
-    MPE = {lift_stats['mpe']:.1f}%
-    Correlation = {lift_stats['correlation']:.4f}"""
+R² = {lift_stats['r2']:.4f}
+RMSE = {lift_stats['rmse']:.6f}
+MAE = {lift_stats['mae']:.6f}
+MPE = {lift_stats['mpe']:.1f}%"""
     
     ax2.text(0.05, 0.95, lift_stats_text, transform=ax2.transAxes, fontsize=10,
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
@@ -191,83 +283,13 @@ def create_force_r2_plot(force_data, save_path="/data/ahmed_data/analysis/"):
     
     # Save the plot
     os.makedirs(save_path, exist_ok=True)
-    plot_file = os.path.join(save_path, "ahmed_force_r2_analysis.png")
+    plot_file = os.path.join(save_path, "ahmed_individual_force_r2.png")
     plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
-    print(f"📊 R² plot saved to: {plot_file}")
+    print(f"📊 Individual R² plots saved to: {plot_file}")
     
     plt.show()
     
     return drag_stats, lift_stats
-
-def create_combined_force_plot(force_data, save_path="/data/ahmed_data/analysis/"):
-    """
-    Create a combined plot with all forces on the same axes (like the one you showed).
-    """
-    # Extract data arrays
-    drag_true = np.array([data['drag_true'] for data in force_data.values()])
-    drag_pred = np.array([data['drag_pred'] for data in force_data.values()])
-    lift_true = np.array([data['lift_true'] for data in force_data.values()])
-    lift_pred = np.array([data['lift_pred'] for data in force_data.values()])
-    
-    # Combine all forces
-    all_true = np.concatenate([drag_true, lift_true])
-    all_pred = np.concatenate([drag_pred, lift_pred])
-    
-    # Calculate combined R²
-    combined_r2 = r2_score(all_true, all_pred)
-    combined_stats = calculate_r2_and_stats(all_true, all_pred)
-    
-    # Create figure
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-    
-    # Plot points
-    ax.scatter(drag_true, drag_pred, c='#2E86AB', s=80, alpha=0.7, edgecolors='white', 
-               linewidth=1, label=f'Drag Forces (n={len(drag_true)})')
-    ax.scatter(lift_true, lift_pred, c='#A23B72', s=80, alpha=0.7, edgecolors='white', 
-               linewidth=1, label=f'Lift Forces (n={len(lift_true)})')
-    
-    # Perfect prediction line (1:1 line)
-    force_min = min(all_true.min(), all_pred.min())
-    force_max = max(all_true.max(), all_pred.max())
-    ax.plot([force_min, force_max], [force_min, force_max], 'k--', linewidth=2, alpha=0.8, 
-            label='Perfect Prediction (1:1)')
-    
-    # Best fit line for all data
-    z = np.polyfit(all_true, all_pred, 1)
-    p = np.poly1d(z)
-    ax.plot(all_true, p(all_true), 'r-', linewidth=2, alpha=0.8, 
-            label=f'Best Fit (y={z[0]:.3f}x+{z[1]:.4f})')
-    
-    ax.set_xlabel('Force (True)', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Force (Predicted)', fontsize=14, fontweight='bold')
-    ax.set_title(f'Combined Force Prediction\nR² = {combined_r2:.4f}', 
-                fontsize=16, fontweight='bold', pad=20)
-    ax.grid(True, alpha=0.3)
-    ax.legend(frameon=True, fancybox=True, shadow=True, loc='upper left')
-    
-    # Add statistics text box
-    stats_text = f"""Combined Statistics:
-    R² = {combined_stats['r2']:.4f}
-    RMSE = {combined_stats['rmse']:.6f}
-    MAE = {combined_stats['mae']:.6f}
-    MPE = {combined_stats['mpe']:.1f}%
-    Total Points = {len(all_true)}"""
-    
-    ax.text(0.95, 0.05, stats_text, transform=ax.transAxes, fontsize=11,
-            verticalalignment='bottom', horizontalalignment='right',
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
-    
-    plt.tight_layout()
-    
-    # Save the plot
-    os.makedirs(save_path, exist_ok=True)
-    plot_file = os.path.join(save_path, "ahmed_combined_force_r2.png")
-    plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
-    print(f"📊 Combined R² plot saved to: {plot_file}")
-    
-    plt.show()
-    
-    return combined_stats
 
 def print_summary_results(drag_stats, lift_stats, combined_stats):
     """
@@ -311,7 +333,7 @@ def print_summary_results(drag_stats, lift_stats, combined_stats):
     print(f"Lift Force R²: {assess_r2(lift_stats['r2'])} ({lift_stats['r2']:.4f})")
     print(f"Combined R²: {assess_r2(combined_stats['r2'])} ({combined_stats['r2']:.4f})")
     
-    # DoMINO paper comparison (if available)
+    # DoMINO paper comparison
     domino_paper_r2 = 0.96  # Typical reported R² for DoMINO paper
     print(f"\n📋 COMPARISON TO DOMINO PAPER:")
     print("─"*40)
@@ -327,23 +349,6 @@ def print_summary_results(drag_stats, lift_stats, combined_stats):
     
     print("="*80)
 
-def save_statistics_to_csv(drag_stats, lift_stats, combined_stats, save_path="/data/ahmed_data/analysis/"):
-    """
-    Save R² statistics to CSV file.
-    """
-    stats_data = [
-        {'Force_Type': 'Drag', **drag_stats},
-        {'Force_Type': 'Lift', **lift_stats},
-        {'Force_Type': 'Combined', **combined_stats}
-    ]
-    
-    df = pd.DataFrame(stats_data)
-    
-    os.makedirs(save_path, exist_ok=True)
-    csv_file = os.path.join(save_path, "ahmed_force_r2_statistics.csv")
-    df.to_csv(csv_file, index=False)
-    print(f"💾 R² statistics saved to: {csv_file}")
-
 def main():
     """
     Main function to run the complete R² analysis.
@@ -355,19 +360,16 @@ def main():
     force_data = extract_force_data_from_test_results()
     print(f"📊 Loaded force data for {len(force_data)} test cases")
     
-    # Create individual drag/lift plots
-    print("\n📈 Creating individual force R² plots...")
-    drag_stats, lift_stats = create_force_r2_plot(force_data)
-    
     # Create combined force plot (like the one you showed)
     print("\n📈 Creating combined force R² plot...")
     combined_stats = create_combined_force_plot(force_data)
     
+    # Create individual drag/lift plots
+    print("\n📈 Creating individual force R² plots...")
+    drag_stats, lift_stats = create_individual_force_plots(force_data)
+    
     # Print comprehensive results
     print_summary_results(drag_stats, lift_stats, combined_stats)
-    
-    # Save statistics to CSV
-    save_statistics_to_csv(drag_stats, lift_stats, combined_stats)
     
     print(f"\n🎉 R² analysis complete!")
     print("="*50)
