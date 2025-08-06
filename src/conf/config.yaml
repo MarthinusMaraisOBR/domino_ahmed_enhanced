@@ -43,6 +43,10 @@ data_processor: # Data processor configurable parameters
   cached_dir: /data/ahmed_data/cached/  # FIXED Changed from AWS paths
   use_cache: false
   num_processors: 8  # FIXED: NVIDIA Guideline 5 - Reduced from 12 for Docker stability
+  
+  # Enhanced features configuration
+  use_enhanced_features: true  # Enable dual-resolution enhancement
+  coarse_input_dir: /data/ahmed_data_rans/raw/  # Path to coarse RANS data
 
 # ┌───────────────────────────────────────────┐
 # │            Solution variables             │
@@ -59,6 +63,13 @@ variables:
       # wallShearStress: vector        # Wall shear stress
       # p: scalar                      # Static pressure
       # tau_wall: vector              # Wall shear stress
+    
+    # Enhanced features configuration
+    enhanced_features:
+      input_feature_count: 8  # 4 fine + 4 coarse interpolated features
+      coarse_variable_mapping:  # Mapping from fine to coarse variable names
+        pMean: p
+        wallShearStressMean: wallShearStress
   
   # NVIDIA Guideline 7: Volume variables REMOVED for Ahmed surface-only dataset
   volume:
@@ -179,6 +190,13 @@ model:
     scaling_params: [1.0, 1.0] # FIXED: Changed from [30.0, 1.226] to standard [inlet_velocity, air_density]
     fourier_features: false
     num_modes: 5
+  
+  # Enhanced model configuration
+  enhanced_model:
+    surface_input_features: 8  # 4 fine + 4 coarse features
+    coarse_feature_processor:
+      hidden_layers: [256, 128]
+      activation: ${model.activation}
 
 # ┌───────────────────────────────────────────┐
 # │          Training Configs                 │
@@ -210,6 +228,7 @@ val: # Validation configurable parameters
 # └───────────────────────────────────────────┘  
 eval: # Testing configurable parameters
   test_path: /data/ahmed_data/ahmed_data/raw_test/  # ← Only runs 451-500
+  coarse_test_path: /data/ahmed_data_rans/raw_test/  # Coarse test data for enhanced mode
   save_path: /data/ahmed_data/predictions/  # FIXED NVIDIA Guideline 17
   checkpoint_name: DoMINO.0.499.pt
   scaling_param_path: outputs/Ahmed_Dataset/scaling_params  # FIXED NVIDIA Guideline 19

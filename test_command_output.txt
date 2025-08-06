@@ -1,0 +1,372 @@
+root@6814dd651431:/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src# python test.py
+Config summary:
+data:
+  bounding_box:
+    max:
+    - 6.0
+    - 1.0
+    - 1.4
+    min:
+    - -4.0
+    - -1.0
+    - 0.0
+  bounding_box_surface:
+    max:
+    - 1.8
+    - 0.4
+    - 0.8
+    min:
+    - -0.5
+    - -0.4
+    - -0.4
+  gpu_output: true
+  gpu_preprocessing: true
+  input_dir: /data/ahmed_data/ahmed_data/train/
+  input_dir_val: /data/ahmed_data/ahmed_data/validation/
+data_processor:
+  cached_dir: /data/ahmed_data/cached/
+  input_dir: /data/ahmed_data/raw/
+  kind: ahmed
+  num_processors: 8
+  output_dir: /data/ahmed_data/ahmed_data/train/
+  use_cache: false
+domain_parallelism:
+  domain_size: 1
+  shard_grid: false
+  shard_points: false
+eval:
+  checkpoint_name: DoMINO.0.499.pt
+  refine_stl: false
+  save_path: /data/ahmed_data/predictions/
+  scaling_param_path: outputs/Ahmed_Dataset/scaling_params
+  stencil_size: 7
+  test_path: /data/ahmed_data/ahmed_data/raw_test/
+exp_tag: 1
+model:
+  activation: relu
+  aggregation_model:
+    activation: ${model.activation}
+    base_layer: 512
+  encode_parameters: false
+  geom_points_sample: 100000
+  geometry_encoding_type: both
+  geometry_local:
+    base_layer: 512
+    surface_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    surface_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+    volume_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    volume_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+  geometry_rep:
+    geo_conv:
+      activation: ${model.activation}
+      base_neurons: 32
+      base_neurons_out: 1
+      hops: 1
+      surface_radii:
+      - 0.01
+      - 0.05
+      - 0.1
+      volume_radii:
+      - 0.1
+      - 0.5
+      - 2.5
+      - 5.0
+    geo_processor:
+      activation: ${model.activation}
+      base_filters: 8
+    geo_processor_sdf:
+      base_filters: 8
+  integral_loss_scaling_factor: 100
+  interp_res:
+  - 128
+  - 64
+  - 64
+  local_point_conv:
+    activation: ${model.activation}
+  loss_function:
+    area_weighing_factor: 10000
+    loss_type: mse
+  model_type: surface
+  nn_basis_functions:
+    activation: ${model.activation}
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+  normalization: min_max_scaling
+  num_surface_neighbors: 7
+  parameter_model:
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+    scaling_params:
+    - 1.0
+    - 1.0
+  position_encoder:
+    base_neurons: 512
+  positional_encoding: false
+  resampling_surface_mesh:
+    points: 1000000
+    resample: false
+  solution_calculation_mode: two-loop
+  surf_loss_scaling: 1.0
+  surface_neighbors: true
+  surface_points_sample: 8192
+  surface_sampling_algorithm: area_weighted
+  use_sdf_in_basis_func: true
+  use_surface_area: true
+  use_surface_normals: true
+  vol_loss_scaling: 0.0
+  volume_points_sample: 0
+output: outputs/${project.name}/${exp_tag}
+project:
+  name: Ahmed_Dataset
+project_dir: outputs/${project.name}/
+resume_dir: ${output}/models
+train:
+  checkpoint_dir: null
+  checkpoint_interval: 50
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  epochs: 500
+  sampler:
+    drop_last: false
+    shuffle: true
+val:
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  sampler:
+    drop_last: false
+    shuffle: true
+variables:
+  surface:
+    solution:
+      pMean: scalar
+      wallShearStressMean: vector
+  volume:
+    solution:
+      UMeanTrim: vector
+      nutMeanTrim: scalar
+      pMeanTrim: scalar
+
+/usr/local/lib/python3.12/dist-packages/physicsnemo/distributed/manager.py:415: UserWarning: Could not initialize using ENV, SLURM or OPENMPI methods. Assuming this is a single process job
+  warn(
+Vol factors: None
+Surf factors: [[ 0.4352239   0.00156042  0.00616695  0.00379482]
+ [-1.5603193  -0.01243142 -0.00616341 -0.00606791]]
+Model loaded
+Drag= run_471 0.014622377 0.019690385
+Lift= run_471 0.013706224 0.017482838
+Side= run_471 0.0012724488 -5.9028935e-06
+Surface L-2 norm: run_471 [0.16094208 0.16689427 0.15129316 0.16067451]
+Drag= run_451 0.015251859 0.020506265
+Lift= run_451 -0.0050089946 -0.008251523
+Side= run_451 -0.0002798084 1.560348e-05
+Surface L-2 norm: run_451 [0.17617446 0.18002732 0.15533237 0.16844839]
+Drag= run_452 0.013661954 0.016773319
+Lift= run_452 -0.0009903582 -0.0011722692
+Side= run_452 0.0006099 3.694153e-05
+Surface L-2 norm: run_452 [0.19310841 0.19500934 0.17908145 0.1762916 ]
+Drag= run_453 0.015869789 0.021863844
+Lift= run_453 0.021097284 0.027807597
+Side= run_453 0.00094095396 1.623435e-05
+Surface L-2 norm: run_453 [0.18646984 0.17816396 0.17140085 0.17952639]
+Drag= run_454 0.017768567 0.020035118
+Lift= run_454 -0.002086381 -0.005423565
+Side= run_454 -0.0009836676 -0.0001509563
+Surface L-2 norm: run_454 [0.19215707 0.17628172 0.17194611 0.18338631]
+Drag= run_455 0.018233161 0.021919718
+Lift= run_455 0.019724455 0.024284588
+Side= run_455 -0.00076258834 3.949887e-05
+Surface L-2 norm: run_455 [0.19534592 0.19876242 0.18697204 0.22534567]
+Drag= run_456 0.017103598 0.02057663
+Lift= run_456 -0.008685019 -0.010250852
+Side= run_456 0.0012247028 0.00073083455
+Surface L-2 norm: run_456 [0.17480059 0.16733284 0.16216452 0.19022878]
+Drag= run_457 0.013760599 0.019583957
+Lift= run_457 0.018575892 0.024955261
+Side= run_457 -3.937478e-05 7.856803e-07
+Surface L-2 norm: run_457 [0.18899497 0.18758997 0.1985021  0.2062358 ]
+Drag= run_458 0.013030946 0.015693163
+Lift= run_458 0.003862555 0.0017811507
+Side= run_458 -4.0164716e-05 8.251573e-06
+Surface L-2 norm: run_458 [0.19848992 0.18864545 0.15596542 0.17377353]
+Drag= run_459 0.015502801 0.021159949
+Lift= run_459 0.012264274 0.026903482
+Side= run_459 -0.00047895015 2.6992297e-05
+Surface L-2 norm: run_459 [0.2543396  0.2043534  0.24002524 0.24202539]
+Drag= run_460 0.013010113 0.016847843
+Lift= run_460 0.014291094 0.022238567
+Side= run_460 0.0009913105 -1.1196176e-05
+Surface L-2 norm: run_460 [0.1940498  0.19039069 0.19061601 0.2329299 ]
+Drag= run_461 0.010820551 0.015669802
+Lift= run_461 0.004768997 -0.00018326567
+Side= run_461 0.00039009232 -7.449067e-06
+Surface L-2 norm: run_461 [0.1698651  0.16797696 0.15408896 0.16154826]
+Drag= run_462 0.019424804 0.019545946
+Lift= run_462 0.012816621 0.02637948
+Side= run_462 -0.00125377 2.9501056e-05
+Surface L-2 norm: run_462 [0.21779604 0.20488451 0.20347452 0.20438339]
+Drag= run_463 0.009155005 0.011927249
+Lift= run_463 0.0025035492 0.0029476194
+Side= run_463 0.0011015905 -2.6004183e-05
+Surface L-2 norm: run_463 [0.16146411 0.17633604 0.1608685  0.19092794]
+Drag= run_464 0.015074913 0.018261002
+Lift= run_464 0.0008914949 0.00034978005
+Side= run_464 0.0005964079 -1.543785e-05
+Surface L-2 norm: run_464 [0.19550943 0.19269036 0.17451742 0.17958844]
+Drag= run_465 0.015525596 0.017513907
+Lift= run_465 0.009950588 0.021725714
+Side= run_465 0.0003303027 1.0690244e-05
+Surface L-2 norm: run_465 [0.225074   0.2153633  0.19382206 0.20721287]
+Drag= run_466 0.009720119 0.012378348
+Lift= run_466 0.00067923655 -0.004082053
+Side= run_466 0.00085360464 9.171679e-05
+Surface L-2 norm: run_466 [0.15799296 0.16792564 0.15266262 0.16115691]
+Drag= run_467 0.01763683 0.021258172
+Lift= run_467 -0.0018979489 -0.0029980158
+Side= run_467 -3.9428618e-05 0.00038206944
+Surface L-2 norm: run_467 [0.18597908 0.17428958 0.18137471 0.16883262]
+Drag= run_468 0.017694706 0.020116696
+Lift= run_468 -0.0027041142 -0.006364572
+Side= run_468 5.1396764e-05 0.00023441412
+Surface L-2 norm: run_468 [0.20031343 0.18319695 0.18783683 0.17623915]
+Drag= run_469 0.013834336 0.017520998
+Lift= run_469 -0.0049789846 -0.009318217
+Side= run_469 0.00079505966 0.00061964826
+Surface L-2 norm: run_469 [0.16507056 0.17995757 0.16546579 0.167934  ]
+Drag= run_470 0.012916472 0.01712855
+Lift= run_470 0.018733507 0.023018533
+Side= run_470 0.00028407207 -2.5546063e-07
+Surface L-2 norm: run_470 [0.1879947  0.1923329  0.18015996 0.18648419]
+Drag= run_472 0.010906483 0.017138
+Lift= run_472 0.0042439336 -0.0019516664
+Side= run_472 0.0008953165 -7.848832e-05
+Surface L-2 norm: run_472 [0.17056428 0.16913918 0.13749798 0.15374775]
+Drag= run_473 0.01137045 0.015192661
+Lift= run_473 0.004646816 -0.00062415795
+Side= run_473 0.00058512454 -3.93491e-06
+Surface L-2 norm: run_473 [0.189391   0.17708176 0.15030415 0.18232647]
+Drag= run_474 0.014308507 0.017342638
+Lift= run_474 0.0057271053 0.001138271
+Side= run_474 -0.0006429123 -1.4153104e-05
+Surface L-2 norm: run_474 [0.21499956 0.20241882 0.15977146 0.17922853]
+Drag= run_475 0.011602955 0.015063497
+Lift= run_475 -0.0023156349 -0.0041994094
+Side= run_475 0.00044534315 -0.00014037163
+Surface L-2 norm: run_475 [0.1631774  0.17436844 0.15226515 0.16565971]
+Drag= run_476 0.011356012 0.015697008
+Lift= run_476 0.001169168 -0.002219163
+Side= run_476 0.00073182717 1.9142284e-05
+Surface L-2 norm: run_476 [0.17593357 0.17789069 0.15746404 0.16690888]
+Drag= run_477 0.015945854 0.01915284
+Lift= run_477 -0.0010878507 -0.0006776011
+Side= run_477 -0.0011885755 0.00010152912
+Surface L-2 norm: run_477 [0.19266531 0.19689721 0.1756073  0.17056856]
+Drag= run_478 0.009145568 0.011696235
+Lift= run_478 0.008901246 0.010303942
+Side= run_478 -0.0001597043 -1.8481223e-05
+Surface L-2 norm: run_478 [0.16759042 0.1759907  0.16343743 0.17859666]
+Drag= run_479 0.018817097 0.019277247
+Lift= run_479 -0.009958901 -0.01042224
+Side= run_479 -0.000313202 -0.0008258628
+Surface L-2 norm: run_479 [0.20903571 0.19028823 0.2125021  0.20143524]
+Drag= run_480 0.01833296 0.02253193
+Lift= run_480 -0.0015354007 -0.00065256143
+Side= run_480 -0.0003574168 0.000117980264
+Surface L-2 norm: run_480 [0.18296447 0.16988093 0.16876969 0.18179828]
+Drag= run_481 0.012428884 0.014501071
+Lift= run_481 0.0040251226 9.413913e-05
+Side= run_481 0.0004223232 -1.204769e-05
+Surface L-2 norm: run_481 [0.18795688 0.17655098 0.16274816 0.17760669]
+Drag= run_482 0.0177359 0.02002936
+Lift= run_482 -0.0072830357 -0.0040939674
+Side= run_482 -0.0013021722 -5.6726105e-05
+Surface L-2 norm: run_482 [0.20829163 0.1826023  0.20046936 0.20150949]
+Drag= run_483 0.01416528 0.016104724
+Lift= run_483 0.015944848 0.018799026
+Side= run_483 -0.0003826886 -8.552897e-06
+Surface L-2 norm: run_483 [0.18692814 0.18712297 0.20598589 0.19529666]
+Drag= run_484 0.014116286 0.016610576
+Lift= run_484 0.0027674064 0.009491528
+Side= run_484 0.0009959886 9.795466e-06
+Surface L-2 norm: run_484 [0.19505382 0.19932225 0.17713872 0.18412307]
+Drag= run_485 0.014294538 0.017309153
+Lift= run_485 0.002036808 0.0016813837
+Side= run_485 -0.0009356471 5.0744973e-05
+Surface L-2 norm: run_485 [0.19475193 0.1796672  0.17522286 0.18154696]
+Drag= run_486 0.009363242 0.012209302
+Lift= run_486 0.0026755766 0.002545014
+Side= run_486 0.0015027686 3.1144835e-05
+Surface L-2 norm: run_486 [0.16494189 0.17213063 0.15741056 0.17854196]
+Drag= run_487 0.018267166 0.01703201
+Lift= run_487 0.018063204 0.0032006553
+Side= run_487 -0.0003129174 -6.0154907e-05
+Surface L-2 norm: run_487 [0.23823713 0.1856474  0.21355382 0.19596829]
+Drag= run_488 0.010996926 0.013594559
+Lift= run_488 0.011884054 0.010172614
+Side= run_488 0.00030509516 -4.3667307e-05
+Surface L-2 norm: run_488 [0.16363566 0.1803656  0.15781705 0.16615976]
+Drag= run_489 0.013515325 0.017592296
+Lift= run_489 -0.004158451 -0.0039974223
+Side= run_489 -0.00050357473 0.00011920766
+Surface L-2 norm: run_489 [0.17012204 0.19169217 0.15730387 0.17458716]
+Drag= run_490 0.013589865 0.01847162
+Lift= run_490 0.004321606 -0.0021978985
+Side= run_490 0.0013454579 -4.109805e-05
+Surface L-2 norm: run_490 [0.16471459 0.16773522 0.14015739 0.15607549]
+Drag= run_491 0.016976425 0.01900511
+Lift= run_491 0.0007583749 -0.0019824503
+Side= run_491 0.00045182987 2.3595658e-06
+Surface L-2 norm: run_491 [0.19749825 0.18083358 0.17670162 0.18906239]
+Drag= run_492 0.0127689075 0.017835112
+Lift= run_492 0.021588672 0.031423803
+Side= run_492 8.8800574e-05 -1.5845682e-05
+Surface L-2 norm: run_492 [0.20890547 0.19800787 0.17788498 0.2044363 ]
+Drag= run_493 0.014738664 0.017620172
+Lift= run_493 -0.0014192088 0.000540521
+Side= run_493 0.00056315586 -0.000103872044
+Surface L-2 norm: run_493 [0.1800715  0.18118247 0.16676474 0.17784841]
+Drag= run_494 0.012391338 0.016364504
+Lift= run_494 0.014109424 0.017479029
+Side= run_494 0.0012053273 -2.4542649e-05
+Surface L-2 norm: run_494 [0.16780017 0.17681508 0.16772431 0.17900221]
+Drag= run_495 0.0113184815 0.014674928
+Lift= run_495 0.011758382 0.0185406
+Side= run_495 0.0005633725 -1.5685917e-05
+Surface L-2 norm: run_495 [0.20189427 0.1994642  0.17271923 0.19409624]
+Drag= run_496 0.010872352 0.014179592
+Lift= run_496 -0.0045317 -0.005436354
+Side= run_496 -0.0002081857 -0.00018243596
+Surface L-2 norm: run_496 [0.17261092 0.18598801 0.15765813 0.17449592]
+Drag= run_497 0.016088285 0.016516969
+Lift= run_497 0.010899753 0.023130007
+Side= run_497 0.0001875881 -1.2771634e-05
+Surface L-2 norm: run_497 [0.22217262 0.20644614 0.22103949 0.22377945]
+Drag= run_498 0.012766424 0.018368697
+Lift= run_498 -0.003208895 -0.005080638
+Side= run_498 0.00091017643 0.00018242211
+Surface L-2 norm: run_498 [0.1598711  0.1770737  0.15086107 0.1731601 ]
+Drag= run_499 0.013718652 0.015192436
+Lift= run_499 -0.0031214622 -0.0063606803
+Side= run_499 0.00051393197 -0.0006735075
+Surface L-2 norm: run_499 [0.19172779 0.17357658 0.19555523 0.18395251]
+Drag= run_500 0.015035077 0.018198896
+Lift= run_500 0.015663102 0.020889087
+Side= run_500 0.0005827359 4.4154585e-06
+Surface L-2 norm: run_500 [0.2002401  0.20823376 0.17711477 0.20904598]
+root@6814dd651431:/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src# 
+

@@ -66,11 +66,16 @@ from physicsnemo.utils.domino.utils import *
 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 import time
 
+# Add this line with your other imports at the top
+from enhanced_domino_model import DoMINOEnhanced
+
+
 # Initialize NVML
 nvmlInit()
 
 
 from physicsnemo.utils.profiling import profile, Profiler
+from enhanced_domino_model import DoMINOEnhanced
 
 # Profiler().enable("line_profiler")
 # Profiler().initialize()
@@ -266,39 +271,30 @@ def compute_loss_dict(
     surf_loss_scaling: float,
     vol_loss_scaling: float,
 ) -> tuple[torch.Tensor, dict]:
-    """
-    Compute the loss terms in a single function call.
-
-    Computes:
-    - Volume loss if prediction_vol is not None
-    - Surface loss if prediction_surf is not None
-    - Integral loss if prediction_surf is not None
-    - Total loss as a weighted sum of the above
-
-    Returns:
-    - Total loss as a scalar tensor
-    - Dictionary of loss terms (for logging, etc)
-    """
+    """Compute the loss terms for standard training."""
     nvtx.range_push("Loss Calculation")
     total_loss_terms = []
     loss_dict = {}
 
+    # Volume loss
     if prediction_vol is not None:
         target_vol = batch_inputs["volume_fields"]
-
         loss_vol = loss_fn(
             prediction_vol, target_vol, loss_fn_type.loss_type, padded_value=-10
         )
+        if loss_fn_type.loss_type == "mse":
+            loss_vol = loss_vol * vol_loss_scaling
         loss_dict["loss_vol"] = loss_vol
         total_loss_terms.append(loss_vol)
 
+    # Surface loss
     if prediction_surf is not None:
-
         target_surf = batch_inputs["surface_fields"]
         surface_areas = batch_inputs["surface_areas"]
         surface_areas = torch.unsqueeze(surface_areas, -1)
         surface_normals = batch_inputs["surface_normals"]
         stream_velocity = batch_inputs["stream_velocity"]
+
         loss_surf = loss_fn_surface(
             prediction_surf,
             target_surf,
@@ -322,6 +318,109 @@ def compute_loss_dict(
         loss_dict["loss_surf"] = 0.5 * loss_surf
         total_loss_terms.append(0.5 * loss_surf_area)
         loss_dict["loss_surf_area"] = 0.5 * loss_surf_area
+
+        loss_integral = (
+            integral_loss_fn(
+                prediction_surf,
+                target_surf,
+                surface_areas,
+                surface_normals,
+                stream_velocity,
+                padded_value=-10,
+            )
+        ) * integral_scaling_factor
+        loss_dict["loss_integral"] = loss_integral
+        total_loss_terms.append(loss_integral)
+
+    total_loss = sum(total_loss_terms)
+    loss_dict["total_loss"] = total_loss
+    nvtx.range_pop()
+
+    return total_loss, loss_dict
+
+
+# Modify the compute_loss_dict function to handle enhanced training
+def compute_loss_dict_enhanced(
+    prediction_vol: torch.Tensor,
+    prediction_surf: torch.Tensor,
+    batch_inputs: dict,
+    loss_fn_type: dict,
+    integral_scaling_factor: float,
+    surf_loss_scaling: float,
+    vol_loss_scaling: float,
+    use_enhanced_features: bool = False,
+) -> tuple[torch.Tensor, dict]:
+    """
+    Compute the loss terms for enhanced training.
+    
+    When use_enhanced_features=True:
+    - prediction_surf contains predicted fine features (from coarse input)
+    - batch_inputs["surface_fields"] contains 8 features [fine, coarse]
+    - We compare predictions against the fine features only
+    """
+    nvtx.range_push("Loss Calculation")
+    total_loss_terms = []
+    loss_dict = {}
+
+    # Volume loss remains unchanged
+    if prediction_vol is not None:
+        target_vol = batch_inputs["volume_fields"]
+        loss_vol = loss_fn(
+            prediction_vol, target_vol, loss_fn_type.loss_type, padded_value=-10
+        )
+        loss_dict["loss_vol"] = loss_vol
+        total_loss_terms.append(loss_vol)
+
+    # Surface loss with enhanced features
+    if prediction_surf is not None:
+        surface_areas = batch_inputs["surface_areas"]
+        surface_areas = torch.unsqueeze(surface_areas, -1)
+        surface_normals = batch_inputs["surface_normals"]
+        stream_velocity = batch_inputs["stream_velocity"]
+        
+        if use_enhanced_features:
+            # Extract fine features as target (first 4 features)
+            surface_fields_all = batch_inputs["surface_fields"]
+            target_surf = surface_fields_all[..., :4]  # Fine features only
+            
+            # Log coarse-to-fine improvement
+            coarse_features = surface_fields_all[..., 4:8]
+            
+            # Calculate baseline error (using coarse as prediction)
+            baseline_error = torch.mean((coarse_features - target_surf) ** 2)
+            prediction_error = torch.mean((prediction_surf - target_surf) ** 2)
+            improvement = (baseline_error - prediction_error) / baseline_error
+            loss_dict["improvement"] = improvement
+        else:
+            # Standard training
+            target_surf = batch_inputs["surface_fields"]
+        
+        # Calculate losses
+        loss_surf = loss_fn_surface(
+            prediction_surf,
+            target_surf,
+            loss_fn_type.loss_type,
+        )
+
+        loss_surf_area = loss_fn_area(
+            prediction_surf,
+            target_surf,
+            surface_normals,
+            surface_areas,
+            area_scaling_factor=loss_fn_type.area_weighing_factor,
+            loss_type=loss_fn_type.loss_type,
+        )
+
+        if loss_fn_type.loss_type == "mse":
+            loss_surf = loss_surf * surf_loss_scaling
+            loss_surf_area = loss_surf_area * surf_loss_scaling
+
+        total_loss_terms.append(0.5 * loss_surf)
+        loss_dict["loss_surf"] = 0.5 * loss_surf
+        total_loss_terms.append(0.5 * loss_surf_area)
+        loss_dict["loss_surf_area"] = 0.5 * loss_surf_area
+        
+        # Integral loss
         loss_integral = (
             integral_loss_fn(
                 prediction_surf,
@@ -375,6 +474,66 @@ def validation_step(
             running_vloss += loss.item()
 
     avg_vloss = running_vloss / (i_batch + 1)
+
+    return avg_vloss
+
+
+# Similar modifications needed for validation_step function
+def validation_step_enhanced(
+    dataloader,
+    model,
+    device,
+    logger,
+    use_sdf_basis=False,
+    use_surface_normals=False,
+    integral_scaling_factor=1.0,
+    loss_fn_type=None,
+    vol_loss_scaling=None,
+    surf_loss_scaling=None,
+    use_enhanced_features=False,
+):
+    """Enhanced validation handling coarse-to-fine prediction."""
+    running_vloss = 0.0
+    running_improvement = 0.0
+    
+    with torch.no_grad():
+        for i_batch, sample_batched in enumerate(dataloader):
+            sampled_batched = dict_to_device(sample_batched, device)
+
+            with autocast(enabled=True):
+                prediction_vol, prediction_surf = model(sampled_batched)
+                
+                if use_enhanced_features:
+                    loss, loss_dict = compute_loss_dict_enhanced(
+                        prediction_vol,
+                        prediction_surf,
+                        sampled_batched,
+                        loss_fn_type,
+                        integral_scaling_factor,
+                        surf_loss_scaling,
+                        vol_loss_scaling,
+                        use_enhanced_features=True,
+                    )
+                    if "improvement" in loss_dict:
+                        running_improvement += loss_dict["improvement"].item()
+                else:
+                    loss, loss_dict = compute_loss_dict(
+                        prediction_vol,
+                        prediction_surf,
+                        sampled_batched,
+                        loss_fn_type,
+                        integral_scaling_factor,
+                        surf_loss_scaling,
+                        vol_loss_scaling,
+                    )
+
+            running_vloss += loss.item()
+
+    avg_vloss = running_vloss / (i_batch + 1)
+    
+    if use_enhanced_features:
+        avg_improvement = running_improvement / (i_batch + 1)
+        logger.info(f"Validation - Average improvement over coarse: {avg_improvement:.1%}")
 
     return avg_vloss
 
@@ -469,6 +628,126 @@ def train_epoch(
     return last_loss
 
 
+# Add modified train_epoch function
+@profile
+def train_epoch_enhanced(
+    dataloader,
+    model,
+    optimizer,
+    scaler,
+    tb_writer,
+    logger,
+    gpu_handle,
+    epoch_index,
+    device,
+    integral_scaling_factor,
+    loss_fn_type,
+    vol_loss_scaling=None,
+    surf_loss_scaling=None,
+    use_enhanced_features=False,
+):
+    """Enhanced training epoch handling coarse-to-fine prediction."""
+    
+    dist = DistributedManager()
+    running_loss = 0.0
+    running_improvement = 0.0  # Track improvement over baseline
+    loss_interval = 1
+
+    gpu_start_info = nvmlDeviceGetMemoryInfo(gpu_handle)
+    start_time = time.perf_counter()
+    
+    for i_batch, sample_batched in enumerate(dataloader):
+        sampled_batched = dict_to_device(sample_batched, device)
+
+        with autocast(enabled=True):
+            with nvtx.range("Model Forward Pass"):
+                prediction_vol, prediction_surf = model(sampled_batched)
+
+            # Use enhanced loss calculation if needed
+            if use_enhanced_features:
+                loss, loss_dict = compute_loss_dict_enhanced(
+                    prediction_vol,
+                    prediction_surf,
+                    sampled_batched,
+                    loss_fn_type,
+                    integral_scaling_factor,
+                    surf_loss_scaling,
+                    vol_loss_scaling,
+                    use_enhanced_features=True,
+                )
+                
+                if "improvement" in loss_dict:
+                    running_improvement += loss_dict["improvement"].item()
+            else:
+                loss, loss_dict = compute_loss_dict(
+                    prediction_vol,
+                    prediction_surf,
+                    sampled_batched,
+                    loss_fn_type,
+                    integral_scaling_factor,
+                    surf_loss_scaling,
+                    vol_loss_scaling,
+                )
+
+        loss = loss / loss_interval
+        scaler.scale(loss).backward()
+
+        if ((i_batch + 1) % loss_interval == 0) or (i_batch + 1 == len(dataloader)):
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+
+        # Gather data and report
+        running_loss += loss.item()
+        
+        # Enhanced logging
+        elapsed_time = time.perf_counter() - start_time
+        start_time = time.perf_counter()
+        gpu_end_info = nvmlDeviceGetMemoryInfo(gpu_handle)
+        gpu_memory_used = gpu_end_info.used / (1024**3)
+        gpu_memory_delta = (gpu_end_info.used - gpu_start_info.used) / (1024**3)
+
+        logging_string = f"Device {device}, batch processed: {i_batch + 1}\n"
+        
+        # Format the loss dict into a string
+        loss_string = (
+            "  "
+            + "\t".join([f"{key.replace('loss_',''):<10}" for key in loss_dict.keys() if key != "improvement"])
+            + "\n"
+        )
+        loss_string += (
+            "  " + f"\t".join([f"{l.item():<10.3e}" for k, l in loss_dict.items() if k != "improvement"]) + "\n"
+        )
+
+        if use_enhanced_features and "improvement" in loss_dict:
+            loss_string += f"  Improvement over coarse baseline: {loss_dict['improvement'].item():.1%}\n"
+
+        logging_string += loss_string
+        logging_string += f"  GPU memory used: {gpu_memory_used:.3f} Gb\n"
+        logging_string += f"  GPU memory delta: {gpu_memory_delta:.3f} Gb\n"
+        logging_string += f"  Time taken: {elapsed_time:.2f} seconds\n"
+        logger.info(logging_string)
+        gpu_start_info = nvmlDeviceGetMemoryInfo(gpu_handle)
+
+    last_loss = running_loss / (i_batch + 1)
+    
+    if use_enhanced_features:
+        avg_improvement = running_improvement / (i_batch + 1)
+        logger.info(f"Average improvement over coarse: {avg_improvement:.1%}")
+    
+    if dist.rank == 0:
+        logger.info(
+            f" Device {device},  batch: {i_batch + 1}, loss norm: {loss.item():.5f}"
+        )
+        tb_x = epoch_index * len(dataloader) + i_batch + 1
+        tb_writer.add_scalar("Loss/train", last_loss, tb_x)
+        
+        if use_enhanced_features:
+            tb_writer.add_scalar("Improvement/train", avg_improvement, tb_x)
+
+    return last_loss
+
+
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> None:
 
@@ -492,6 +771,13 @@ def main(cfg: DictConfig) -> None:
     logger = RankZeroLoggingWrapper(logger, dist)
 
     logger.info(f"Config summary:\n{OmegaConf.to_yaml(cfg, sort_keys=True)}")
+
+    # Check if enhanced features are enabled
+    use_enhanced_features = cfg.data_processor.get('use_enhanced_features', False)
+    
+    if use_enhanced_features:
+        logger.info("🚀 ENHANCED TRAINING MODE - Coarse-to-Fine Prediction")
+        logger.info("  Training to predict fine resolution from coarse input")
 
     num_vol_vars = 0
     volume_variable_names = []
@@ -579,12 +865,24 @@ def main(cfg: DictConfig) -> None:
         **cfg.val.dataloader,
     )
 
-    model = DoMINO(
-        input_features=3,
-        output_features_vol=num_vol_vars,
-        output_features_surf=num_surf_vars,
-        model_parameters=cfg.model,
-    ).to(dist.device)
+    # Model creation - use enhanced model if configured
+    if use_enhanced_features:
+        logger.info("Creating DoMINOEnhanced model for coarse-to-fine prediction")
+        model = DoMINOEnhanced(
+            input_features=3,
+            output_features_vol=num_vol_vars,
+            output_features_surf=num_surf_vars,
+            model_parameters=cfg.model,
+        ).to(dist.device)
+    else:
+        logger.info("Creating standard DoMINO model")
+        model = DoMINO(
+            input_features=3,
+            output_features_vol=num_vol_vars,
+            output_features_surf=num_surf_vars,
+            model_parameters=cfg.model,
+        ).to(dist.device)
+    
     model = torch.compile(model, disable=True)  # TODO make this configurable
 
     # Print model summary (structure and parmeter count).
@@ -666,21 +964,42 @@ def main(cfg: DictConfig) -> None:
 
         model.train(True)
         epoch_start_time = time.perf_counter()
-        avg_loss = train_epoch(
-            dataloader=train_dataloader,
-            model=model,
-            optimizer=optimizer,
-            scaler=scaler,
-            tb_writer=writer,
-            logger=logger,
-            gpu_handle=gpu_handle,
-            epoch_index=epoch,
-            device=dist.device,
-            integral_scaling_factor=initial_integral_factor,
-            loss_fn_type=cfg.model.loss_function,
-            vol_loss_scaling=cfg.model.vol_loss_scaling,
-            surf_loss_scaling=surface_scaling_loss,
-        )
+        
+        # Use enhanced training functions if enhanced features are enabled
+        if use_enhanced_features:
+            avg_loss = train_epoch_enhanced(
+                dataloader=train_dataloader,
+                model=model,
+                optimizer=optimizer,
+                scaler=scaler,
+                tb_writer=writer,
+                logger=logger,
+                gpu_handle=gpu_handle,
+                epoch_index=epoch,
+                device=dist.device,
+                integral_scaling_factor=initial_integral_factor,
+                loss_fn_type=cfg.model.loss_function,
+                vol_loss_scaling=cfg.model.vol_loss_scaling,
+                surf_loss_scaling=surface_scaling_loss,
+                use_enhanced_features=use_enhanced_features,
+            )
+        else:
+            avg_loss = train_epoch(
+                dataloader=train_dataloader,
+                model=model,
+                optimizer=optimizer,
+                scaler=scaler,
+                tb_writer=writer,
+                logger=logger,
+                gpu_handle=gpu_handle,
+                epoch_index=epoch,
+                device=dist.device,
+                integral_scaling_factor=initial_integral_factor,
+                loss_fn_type=cfg.model.loss_function,
+                vol_loss_scaling=cfg.model.vol_loss_scaling,
+                surf_loss_scaling=surface_scaling_loss,
+            )
+
         epoch_end_time = time.perf_counter()
         logger.info(
             f"Device {dist.device}, Epoch {epoch_number} took {epoch_end_time - epoch_start_time:.3f} seconds"
@@ -688,18 +1007,35 @@ def main(cfg: DictConfig) -> None:
         epoch_end_time = time.perf_counter()
 
         model.eval()
-        avg_vloss = validation_step(
-            dataloader=val_dataloader,
-            model=model,
-            device=dist.device,
-            logger=logger,
-            use_sdf_basis=cfg.model.use_sdf_in_basis_func,
-            use_surface_normals=cfg.model.use_surface_normals,
-            integral_scaling_factor=initial_integral_factor,
-            loss_fn_type=cfg.model.loss_function,
-            vol_loss_scaling=cfg.model.vol_loss_scaling,
-            surf_loss_scaling=surface_scaling_loss,
-        )
+        
+        # Use enhanced validation if enhanced features are enabled
+        if use_enhanced_features:
+            avg_vloss = validation_step_enhanced(
+                dataloader=val_dataloader,
+                model=model,
+                device=dist.device,
+                logger=logger,
+                use_sdf_basis=cfg.model.use_sdf_in_basis_func,
+                use_surface_normals=cfg.model.use_surface_normals,
+                integral_scaling_factor=initial_integral_factor,
+                loss_fn_type=cfg.model.loss_function,
+                vol_loss_scaling=cfg.model.vol_loss_scaling,
+                surf_loss_scaling=surface_scaling_loss,
+                use_enhanced_features=use_enhanced_features,
+            )
+        else:
+            avg_vloss = validation_step(
+                dataloader=val_dataloader,
+                model=model,
+                device=dist.device,
+                logger=logger,
+                use_sdf_basis=cfg.model.use_sdf_in_basis_func,
+                use_surface_normals=cfg.model.use_surface_normals,
+                integral_scaling_factor=initial_integral_factor,
+                loss_fn_type=cfg.model.loss_function,
+                vol_loss_scaling=cfg.model.vol_loss_scaling,
+                surf_loss_scaling=surface_scaling_loss,
+            )
 
         scheduler.step()
         logger.info(
