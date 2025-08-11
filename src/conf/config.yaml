@@ -197,6 +197,11 @@ model:
     coarse_feature_processor:
       hidden_layers: [256, 128]
       activation: ${model.activation}
+    coarse_to_fine:
+      hidden_layers: [512, 512, 512]  # Match your implementation
+      use_spectral: true              # Enable spectral features
+      use_residual: true              # Enable residual connections
+      activation: ${model.activation} # Inherit main activation
 
 # ┌───────────────────────────────────────────┐
 # │          Training Configs                 │
