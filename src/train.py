@@ -49,7 +49,6 @@ from torch.utils.tensorboard import SummaryWriter
 from nvtx import annotate as nvtx_annotate
 import torch.cuda.nvtx as nvtx
 
-
 from physicsnemo.distributed import DistributedManager
 from physicsnemo.launch.utils import load_checkpoint, save_checkpoint
 from physicsnemo.launch.logging import PythonLogger, RankZeroLoggingWrapper
@@ -66,19 +65,13 @@ from physicsnemo.utils.domino.utils import *
 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 import time
 
-# Add this line with your other imports at the top
+# Import the enhanced model (only once!)
 from enhanced_domino_model import DoMINOEnhanced
 
+from physicsnemo.utils.profiling import profile, Profiler
 
 # Initialize NVML
 nvmlInit()
-
-
-from physicsnemo.utils.profiling import profile, Profiler
-from enhanced_domino_model import DoMINOEnhanced
-
-# Profiler().enable("line_profiler")
-# Profiler().initialize()
 
 
 def loss_fn(
@@ -339,7 +332,6 @@ def compute_loss_dict(
     return total_loss, loss_dict
 
 
-# Modify the compute_loss_dict function to handle enhanced training
 def compute_loss_dict_enhanced(
     prediction_vol: torch.Tensor,
     prediction_surf: torch.Tensor,
@@ -368,6 +360,8 @@ def compute_loss_dict_enhanced(
         loss_vol = loss_fn(
             prediction_vol, target_vol, loss_fn_type.loss_type, padded_value=-10
         )
+        if loss_fn_type.loss_type == "mse":
+            loss_vol = loss_vol * vol_loss_scaling
         loss_dict["loss_vol"] = loss_vol
         total_loss_terms.append(loss_vol)
 
@@ -478,7 +472,6 @@ def validation_step(
     return avg_vloss
 
 
-# Similar modifications needed for validation_step function
 def validation_step_enhanced(
     dataloader,
     model,
@@ -609,8 +602,6 @@ def train_epoch(
         )
 
         logging_string += loss_string
-        # for key, value in loss_dict.items():
-        #     logging_string += f"    {key}: {value.item():.5f}\n"
         logging_string += f"  GPU memory used: {gpu_memory_used:.3f} Gb\n"
         logging_string += f"  GPU memory delta: {gpu_memory_delta:.3f} Gb\n"
         logging_string += f"  Time taken: {elapsed_time:.2f} seconds\n"
@@ -628,7 +619,6 @@ def train_epoch(
     return last_loss
 
 
-# Add modified train_epoch function
 @profile
 def train_epoch_enhanced(
     dataloader,
@@ -742,7 +732,8 @@ def train_epoch_enhanced(
         tb_x = epoch_index * len(dataloader) + i_batch + 1
         tb_writer.add_scalar("Loss/train", last_loss, tb_x)
         
-        if use_enhanced_features:
+        if use_enhanced_features and running_improvement > 0:
+            avg_improvement = running_improvement / (i_batch + 1)
             tb_writer.add_scalar("Improvement/train", avg_improvement, tb_x)
 
     return last_loss
@@ -776,24 +767,31 @@ def main(cfg: DictConfig) -> None:
     use_enhanced_features = cfg.data_processor.get('use_enhanced_features', False)
     
     if use_enhanced_features:
+        logger.info("="*60)
         logger.info("🚀 ENHANCED TRAINING MODE - Coarse-to-Fine Prediction")
+        logger.info("="*60)
         logger.info("  Training to predict fine resolution from coarse input")
+        logger.info(f"  Fine data path: {cfg.data_processor.input_dir}")
+        logger.info(f"  Coarse data path: {cfg.data_processor.coarse_input_dir}")
 
+    # Handle volume variables (check if they exist for surface-only datasets)
     num_vol_vars = 0
     volume_variable_names = []
     if model_type == "volume" or model_type == "combined":
         if hasattr(cfg.variables, 'volume') and cfg.variables.volume is not None:
             volume_variable_names = list(cfg.variables.volume.solution.keys())
+            for j in volume_variable_names:
+                if cfg.variables.volume.solution[j] == "vector":
+                    num_vol_vars += 3
+                else:
+                    num_vol_vars += 1
+            logger.info(f"Volume variables: {volume_variable_names} (total: {num_vol_vars})")
         else:
-            volume_variable_names = []
-        for j in volume_variable_names:
-            if cfg.variables.volume.solution[j] == "vector":
-                num_vol_vars += 3
-            else:
-                num_vol_vars += 1
+            logger.info("No volume variables found - surface-only dataset")
     else:
         num_vol_vars = None
 
+    # Surface variables
     num_surf_vars = 0
     surface_variable_names = []
     if model_type == "surface" or model_type == "combined":
@@ -804,9 +802,11 @@ def main(cfg: DictConfig) -> None:
                 num_surf_vars += 3
             else:
                 num_surf_vars += 1
+        logger.info(f"Surface variables: {surface_variable_names} (total: {num_surf_vars})")
     else:
         num_surf_vars = None
 
+    # Load scaling factors
     vol_save_path = os.path.join(
         "outputs", cfg.project.name, "volume_scaling_factors.npy"
     )
@@ -815,14 +815,17 @@ def main(cfg: DictConfig) -> None:
     )
     if os.path.exists(vol_save_path):
         vol_factors = np.load(vol_save_path)
+        logger.info(f"Loaded volume scaling factors from {vol_save_path}")
     else:
         vol_factors = None
 
     if os.path.exists(surf_save_path):
         surf_factors = np.load(surf_save_path)
+        logger.info(f"Loaded surface scaling factors from {surf_save_path}")
     else:
         surf_factors = None
 
+    # Create datasets
     train_dataset = create_domino_dataset(
         cfg,
         phase="train",
@@ -840,6 +843,7 @@ def main(cfg: DictConfig) -> None:
         surf_factors=surf_factors,
     )
 
+    # Create data loaders
     train_sampler = DistributedSampler(
         train_dataset,
         num_replicas=dist.world_size,
@@ -867,25 +871,33 @@ def main(cfg: DictConfig) -> None:
 
     # Model creation - use enhanced model if configured
     if use_enhanced_features:
-        logger.info("Creating DoMINOEnhanced model for coarse-to-fine prediction")
+        logger.info("\nCreating DoMINOEnhanced model for coarse-to-fine prediction...")
         model = DoMINOEnhanced(
             input_features=3,
             output_features_vol=num_vol_vars,
             output_features_surf=num_surf_vars,
             model_parameters=cfg.model,
         ).to(dist.device)
+        logger.info("  ✅ Enhanced model created successfully")
+        
+        # Log enhanced configuration
+        enhanced_config = cfg.model.get('enhanced_model', {})
+        logger.info(f"  Surface input features: {enhanced_config.get('surface_input_features', 4)}")
+        logger.info(f"  Use spectral: {enhanced_config.get('coarse_to_fine', {}).get('use_spectral', True)}")
+        logger.info(f"  Use residual: {enhanced_config.get('coarse_to_fine', {}).get('use_residual', True)}")
     else:
-        logger.info("Creating standard DoMINO model")
+        logger.info("\nCreating standard DoMINO model...")
         model = DoMINO(
             input_features=3,
             output_features_vol=num_vol_vars,
             output_features_surf=num_surf_vars,
             model_parameters=cfg.model,
         ).to(dist.device)
+        logger.info("  ✅ Standard model created successfully")
     
-    model = torch.compile(model, disable=True)  # TODO make this configurable
+    model = torch.compile(model, disable=True)
 
-    # Print model summary (structure and parmeter count).
+    # Print model summary
     logger.info(f"Model summary:\n{torchinfo.summary(model, verbose=0, depth=2)}\n")
 
     if dist.world_size > 1:
@@ -899,7 +911,7 @@ def main(cfg: DictConfig) -> None:
             static_graph=True,
         )
 
-    # optimizer = apex.optimizers.FusedAdam(model.parameters(), lr=0.001)
+    # Optimizer and scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optimizer, milestones=[100, 200, 300, 400, 500, 600, 700, 800], gamma=0.5
@@ -936,7 +948,7 @@ def main(cfg: DictConfig) -> None:
         init_epoch += 1  # Start with the next epoch
     epoch_number = init_epoch
 
-    # retrive the smallest validation loss if available
+    # Retrieve the smallest validation loss if available
     numbers = []
     for filename in os.listdir(best_model_path):
         match = re.search(r"\d+\.\d*[1-9]\d*", filename)
@@ -948,9 +960,16 @@ def main(cfg: DictConfig) -> None:
 
     initial_integral_factor_orig = cfg.model.integral_loss_scaling_factor
 
+    # Training loop
+    logger.info("\n" + "="*60)
+    logger.info("Starting Training Loop")
+    logger.info("="*60)
+
     for epoch in range(init_epoch, cfg.train.epochs):
         start_time = time.perf_counter()
-        logger.info(f"Device {dist.device}, epoch {epoch_number}:")
+        logger.info(f"\n{'='*40}")
+        logger.info(f"EPOCH {epoch_number}")
+        logger.info(f"{'='*40}")
 
         train_sampler.set_epoch(epoch)
         val_sampler.set_epoch(epoch)
@@ -967,6 +986,7 @@ def main(cfg: DictConfig) -> None:
         
         # Use enhanced training functions if enhanced features are enabled
         if use_enhanced_features:
+            logger.info("Running enhanced training epoch...")
             avg_loss = train_epoch_enhanced(
                 dataloader=train_dataloader,
                 model=model,
@@ -984,6 +1004,7 @@ def main(cfg: DictConfig) -> None:
                 use_enhanced_features=use_enhanced_features,
             )
         else:
+            logger.info("Running standard training epoch...")
             avg_loss = train_epoch(
                 dataloader=train_dataloader,
                 model=model,
@@ -1002,11 +1023,11 @@ def main(cfg: DictConfig) -> None:
 
         epoch_end_time = time.perf_counter()
         logger.info(
-            f"Device {dist.device}, Epoch {epoch_number} took {epoch_end_time - epoch_start_time:.3f} seconds"
+            f"Training epoch {epoch_number} took {epoch_end_time - epoch_start_time:.3f} seconds"
         )
-        epoch_end_time = time.perf_counter()
 
         model.eval()
+        logger.info("Running validation...")
         
         # Use enhanced validation if enhanced features are enabled
         if use_enhanced_features:
@@ -1038,13 +1059,15 @@ def main(cfg: DictConfig) -> None:
             )
 
         scheduler.step()
-        logger.info(
-            f"Device {dist.device} "
-            f"LOSS train {avg_loss:.5f} "
-            f"valid {avg_vloss:.5f} "
-            f"Current lr {scheduler.get_last_lr()[0]} "
-            f"Integral factor {initial_integral_factor}"
-        )
+        
+        logger.info(f"\n{'='*40}")
+        logger.info(f"EPOCH {epoch_number} SUMMARY")
+        logger.info(f"{'='*40}")
+        logger.info(f"  Training loss: {avg_loss:.5f}")
+        logger.info(f"  Validation loss: {avg_vloss:.5f}")
+        logger.info(f"  Learning rate: {scheduler.get_last_lr()[0]:.2e}")
+        logger.info(f"  Integral factor: {initial_integral_factor}")
+        logger.info(f"  Total epoch time: {time.perf_counter() - start_time:.3f} seconds")
 
         if dist.rank == 0:
             writer.add_scalars(
@@ -1058,13 +1081,23 @@ def main(cfg: DictConfig) -> None:
         if dist.world_size > 1:
             torch.distributed.barrier()
 
-        if avg_vloss < best_vloss:  # This only considers GPU: 0, is that okay?
+        if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-
-        if dist.rank == 0:
-            print(f"Device { dist.device}, Best val loss {best_vloss}")
+            logger.info(f"  🏆 NEW BEST VALIDATION LOSS: {best_vloss:.5f}")
+            if dist.rank == 0:
+                save_checkpoint(
+                    to_absolute_path(best_model_path),
+                    models=model,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    scaler=scaler,
+                    epoch=str(best_vloss.item()),  # Use loss as filename
+                )
+        else:
+            logger.info(f"  Best validation loss so far: {best_vloss:.5f}")
 
         if dist.rank == 0 and (epoch + 1) % cfg.train.checkpoint_interval == 0.0:
+            logger.info(f"  💾 Saving checkpoint at epoch {epoch}")
             save_checkpoint(
                 to_absolute_path(model_save_path),
                 models=model,
@@ -1077,8 +1110,19 @@ def main(cfg: DictConfig) -> None:
         epoch_number += 1
 
         if scheduler.get_last_lr()[0] == 1e-6:
-            print("Training ended")
+            logger.info("\n" + "="*60)
+            logger.info("Training ended - Learning rate reached minimum")
+            logger.info("="*60)
             exit()
+
+    logger.info("\n" + "="*60)
+    logger.info("TRAINING COMPLETED SUCCESSFULLY!")
+    logger.info("="*60)
+    logger.info(f"Final best validation loss: {best_vloss:.5f}")
+    logger.info(f"Checkpoints saved in: {model_save_path}")
+    logger.info("\nNext steps:")
+    logger.info("1. Test the model with: python test_enhanced.py")
+    logger.info("2. View training curves in TensorBoard")
 
 
 if __name__ == "__main__":

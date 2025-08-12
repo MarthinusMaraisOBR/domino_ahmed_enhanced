@@ -17,7 +17,7 @@ from physicsnemo.models.layers.weight_norm import WeightNormLinear
 
 
 class FullyConnected(nn.Module):
-    """Simple fully connected network to replace modulus.models.mlp.fully_connected"""
+    """Simple fully connected network"""
     
     def __init__(
         self,
@@ -249,11 +249,19 @@ class DoMINOEnhanced(DoMINO):
                 "coarse_to_fine", {}
             )
             
+            # Get encoding size from parent model
+            # The encoding size is determined by the geometry encoder
+            if hasattr(self, 'encoding_size'):
+                encoding_dim = self.encoding_size
+            else:
+                # Default encoding size from DoMINO
+                encoding_dim = 512
+            
             # Initialize coarse-to-fine model
             self.coarse_to_fine_model = CoarseToFineModel(
                 input_dim=4,  # Coarse surface features
                 output_dim=output_features_surf,  # Fine surface features
-                encoding_dim=self.encoding_size,  # Geometry encoding size
+                encoding_dim=encoding_dim,  # Geometry encoding size
                 hidden_layers=coarse_to_fine_config.get("hidden_layers", [512, 512, 512]),
                 activation=model_parameters.get("activation", "relu"),
                 use_spectral=coarse_to_fine_config.get("use_spectral", True),
@@ -290,8 +298,8 @@ class DoMINOEnhanced(DoMINO):
         
         # Handle volume predictions normally
         if self.output_features_vol is not None:
-            # Standard volume processing
-            vol_predictions = self._forward_volume(inputs_dict)
+            # Standard volume processing - use parent class method
+            vol_predictions = super().forward(inputs_dict)[0]
         else:
             vol_predictions = None
         
@@ -300,8 +308,8 @@ class DoMINOEnhanced(DoMINO):
             # Enhanced surface processing for coarse-to-fine prediction
             surf_predictions = self._forward_surface_enhanced(inputs_dict)
         elif self.output_features_surf is not None:
-            # Standard surface processing
-            surf_predictions = self._forward_surface(inputs_dict)
+            # Standard surface processing - use parent class method
+            surf_predictions = super().forward(inputs_dict)[1]
         else:
             surf_predictions = None
             
@@ -327,14 +335,15 @@ class DoMINOEnhanced(DoMINO):
             fine_features = None
             self.enhanced_training_mode = False
         
-        # Get geometry encoding
+        # Get geometry encoding using parent class methods
         geometry_stl = inputs_dict["geometry_coordinates"]
         
-        # Process geometry through encoder
+        # Process geometry through encoder (from parent class)
         if "grid" in inputs_dict and "sdf_grid" in inputs_dict:
-            geometry_stl_normalized = self._normalize_geometry(
-                geometry_stl, inputs_dict.get("volume_min_max")
-            )
+            vol_min = inputs_dict.get("volume_min_max", torch.zeros((1, 2, 3)))[:, 0]
+            vol_max = inputs_dict.get("volume_min_max", torch.ones((1, 2, 3)))[:, 1]
+            geometry_stl_normalized = 2.0 * (geometry_stl - vol_min) / (vol_max - vol_min) - 1.0
+            
             encoding_g_vol = self.geo_rep_volume(
                 geometry_stl_normalized, 
                 inputs_dict["grid"], 
@@ -344,9 +353,10 @@ class DoMINOEnhanced(DoMINO):
             encoding_g_vol = None
             
         if "surf_grid" in inputs_dict and "sdf_surf_grid" in inputs_dict:
-            geometry_stl_normalized_surf = self._normalize_geometry(
-                geometry_stl, inputs_dict.get("surface_min_max")
-            )
+            surf_min = inputs_dict.get("surface_min_max", torch.zeros((1, 2, 3)))[:, 0]
+            surf_max = inputs_dict.get("surface_min_max", torch.ones((1, 2, 3)))[:, 1]
+            geometry_stl_normalized_surf = 2.0 * (geometry_stl - surf_min) / (surf_max - surf_min) - 1.0
+            
             encoding_g_surf = self.geo_rep_surface(
                 geometry_stl_normalized_surf,
                 inputs_dict["surf_grid"],
@@ -387,22 +397,3 @@ class DoMINOEnhanced(DoMINO):
                 predictions = predictions * param_encoding
         
         return predictions
-    
-    def _normalize_geometry(self, geometry: torch.Tensor, min_max: Optional[torch.Tensor]) -> torch.Tensor:
-        """Helper to normalize geometry coordinates."""
-        if min_max is not None:
-            vol_min = min_max[:, 0]
-            vol_max = min_max[:, 1]
-            return 2.0 * (geometry - vol_min) / (vol_max - vol_min) - 1.0
-        return geometry
-    
-    def _forward_volume(self, inputs_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Standard volume forward pass from parent class."""
-        # This remains unchanged - use parent implementation
-        # We only modify surface processing for coarse-to-fine
-        return super().forward(inputs_dict)[0]
-    
-    def _forward_surface(self, inputs_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Standard surface forward pass from parent class."""
-        # This remains unchanged - use parent implementation
-        return super().forward(inputs_dict)[1]

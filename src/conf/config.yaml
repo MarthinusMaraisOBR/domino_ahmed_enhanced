@@ -36,17 +36,17 @@ resume_dir: ${output}/models
 # ┌───────────────────────────────────────────┐
 # │            Data Preprocessing             │
 # └───────────────────────────────────────────┘  
-data_processor: # Data processor configurable parameters
-  kind: ahmed  # FIXED Changed from drivaer_aws to ahmed
-  output_dir: /data/ahmed_data/ahmed_data/train/     # ← CHANGE: Point to your train folder
-  input_dir: /data/ahmed_data/raw/  # FIXED NVIDIA Guideline 3
-  cached_dir: /data/ahmed_data/cached/  # FIXED Changed from AWS paths
+data_processor:
+  kind: ahmed
+  output_dir: /data/ahmed_data/ahmed_data/train/
+  input_dir: /data/ahmed_data/ahmed_data/raw/        # Fine data path
+  cached_dir: /data/ahmed_data/ahmed_data/cached/
   use_cache: false
-  num_processors: 8  # FIXED: NVIDIA Guideline 5 - Reduced from 12 for Docker stability
+  num_processors: 8
   
   # Enhanced features configuration
-  use_enhanced_features: true  # Enable dual-resolution enhancement
-  coarse_input_dir: /data/ahmed_data_rans/raw/  # Path to coarse RANS data
+  use_enhanced_features: true
+  coarse_input_dir: /data/ahmed_data/ahmed_data_rans/raw/  # Coarse data path
 
 # ┌───────────────────────────────────────────┐
 # │            Solution variables             │
@@ -81,9 +81,9 @@ variables:
 # ┌───────────────────────────────────────────┐
 # │          Training Data Configs            │
 # └───────────────────────────────────────────┘  
-data: # Input directory for training and validation data
-  input_dir: /data/ahmed_data/ahmed_data/train/      # ← CHANGE: Your 400 training files
-  input_dir_val: /data/ahmed_data/ahmed_data/validation/  # ← CHANGE: Use training for validation
+data:
+  input_dir: /data/ahmed_data/ahmed_data/train/
+  input_dir_val: /data/ahmed_data/ahmed_data/validation/
   
   # CRITICAL: NVIDIA Guidelines 10 & 11 - These MUST be updated with actual Ahmed geometry dimensions
   # Current values are estimates - UPDATE AFTER GEOMETRY INSPECTION
@@ -233,7 +233,7 @@ val: # Validation configurable parameters
 # └───────────────────────────────────────────┘  
 eval: # Testing configurable parameters
   test_path: /data/ahmed_data/ahmed_data/raw_test/  # ← Only runs 451-500
-  coarse_test_path: /data/ahmed_data_rans/raw_test/  # Coarse test data for enhanced mode
+  coarse_test_path: /data/ahmed_data/ahmed_data_rans/raw/  # Coarse test data for enhanced mode
   save_path: /data/ahmed_data/predictions/  # FIXED NVIDIA Guideline 17
   checkpoint_name: DoMINO.0.499.pt
   scaling_param_path: outputs/Ahmed_Dataset/scaling_params  # FIXED NVIDIA Guideline 19
