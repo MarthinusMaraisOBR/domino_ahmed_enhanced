@@ -19,7 +19,7 @@
 project: # Project name
   name: Ahmed_Dataset  # FIXED Changed from AWS_Dataset (NVIDIA Guideline 1)
   
-exp_tag: 1 # Experiment tag (NVIDIA Guideline 2) ✅
+exp_tag: enhanced_1 # Experiment tag (NVIDIA Guideline 2) ✅
 
 # Main output directory.
 project_dir: outputs/${project.name}/

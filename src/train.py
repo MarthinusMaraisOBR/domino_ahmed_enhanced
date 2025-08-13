@@ -810,9 +810,22 @@ def main(cfg: DictConfig) -> None:
     vol_save_path = os.path.join(
         "outputs", cfg.project.name, "volume_scaling_factors.npy"
     )
-    surf_save_path = os.path.join(
-        "outputs", cfg.project.name, "surface_scaling_factors.npy"
-    )
+    # Load surface scaling factors - use enhanced version if in enhanced mode
+    if use_enhanced_features:
+        # Look for enhanced scaling factors in the experiment directory
+        surf_save_path = os.path.join(
+            "outputs", cfg.project.name, cfg.exp_tag, "surface_scaling_factors.npy"
+        )
+        if not os.path.exists(surf_save_path):
+            # Fallback to main directory enhanced version
+            surf_save_path = os.path.join(
+                "outputs", cfg.project.name, "surface_scaling_factors_enhanced.npy"
+            )
+        logger.info(f"Using enhanced surface scaling factors from {surf_save_path}")
+    else:
+        surf_save_path = os.path.join(
+            "outputs", cfg.project.name, "surface_scaling_factors.npy"
+        )
     if os.path.exists(vol_save_path):
         vol_factors = np.load(vol_save_path)
         logger.info(f"Loaded volume scaling factors from {vol_save_path}")

@@ -105,7 +105,7 @@ class CoarseToFineModel(nn.Module):
         self,
         input_dim: int = 4,  # Coarse flow features
         output_dim: int = 4,  # Fine flow features
-        encoding_dim: int = 512,  # Geometry encoding dimension
+        encoding_dim: int = 448,  # Geometry encoding dimension (actual output from DoMINO)
         hidden_layers: list = [512, 512, 512],
         activation: str = "relu",
         use_spectral: bool = True,
@@ -249,19 +249,17 @@ class DoMINOEnhanced(DoMINO):
                 "coarse_to_fine", {}
             )
             
-            # Get encoding size from parent model
-            # The encoding size is determined by the geometry encoder
-            if hasattr(self, 'encoding_size'):
-                encoding_dim = self.encoding_size
-            else:
-                # Default encoding size from DoMINO
-                encoding_dim = 512
+            # The actual geometry encoding dimension from DoMINO's local encoder
+            # Based on the error message, this is 448, not 512
+            # The encoding comes from geo_encoding_local which outputs 448 dimensions
+            # for the current model configuration
+            encoding_dim = 448
             
             # Initialize coarse-to-fine model
             self.coarse_to_fine_model = CoarseToFineModel(
                 input_dim=4,  # Coarse surface features
                 output_dim=output_features_surf,  # Fine surface features
-                encoding_dim=encoding_dim,  # Geometry encoding size
+                encoding_dim=encoding_dim,  # Actual geometry encoding size from DoMINO
                 hidden_layers=coarse_to_fine_config.get("hidden_layers", [512, 512, 512]),
                 activation=model_parameters.get("activation", "relu"),
                 use_spectral=coarse_to_fine_config.get("use_spectral", True),
@@ -274,6 +272,7 @@ class DoMINOEnhanced(DoMINO):
             print(f"DoMINOEnhanced initialized:")
             print(f"  - Input: 4 coarse features + geometry")
             print(f"  - Output: {output_features_surf} fine features")
+            print(f"  - Geometry encoding: {encoding_dim} dimensions")
             print(f"  - Use spectral: {coarse_to_fine_config.get('use_spectral', True)}")
             print(f"  - Use residual: {coarse_to_fine_config.get('use_residual', True)}")
             
