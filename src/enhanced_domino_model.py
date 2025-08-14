@@ -388,7 +388,7 @@ class DoMINOEnhanced(DoMINO):
         )
         
         # Scale by inlet parameters if needed
-        if self.encode_params:
+        if self.encode_parameters:
             inlet_velocity = inputs_dict.get("stream_velocity")
             air_density = inputs_dict.get("air_density")
             if inlet_velocity is not None:
