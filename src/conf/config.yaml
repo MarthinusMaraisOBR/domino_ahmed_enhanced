@@ -38,15 +38,15 @@ resume_dir: ${output}/models
 # └───────────────────────────────────────────┘  
 data_processor:
   kind: ahmed
-  output_dir: /data/ahmed_data/ahmed_data/train/
-  input_dir: /data/ahmed_data/ahmed_data/raw/        # Fine data path
+  output_dir: /data/ahmed_data/processed/train/
+  input_dir: /data/ahmed_data/organized/train/fine/
   cached_dir: /data/ahmed_data/ahmed_data/cached/
   use_cache: false
   num_processors: 8
   
   # Enhanced features configuration
   use_enhanced_features: true
-  coarse_input_dir: /data/ahmed_data/ahmed_data_rans/raw/  # Coarse data path
+  coarse_input_dir: /data/ahmed_data/organized/train/coarse/
 
 # ┌───────────────────────────────────────────┐
 # │            Solution variables             │
@@ -82,8 +82,8 @@ variables:
 # │          Training Data Configs            │
 # └───────────────────────────────────────────┘  
 data:
-  input_dir: /data/ahmed_data/ahmed_data/train/
-  input_dir_val: /data/ahmed_data/ahmed_data/validation/
+  input_dir: /data/ahmed_data/processed/train/
+  input_dir_val: /data/ahmed_data/processed/val/
   
   # CRITICAL: NVIDIA Guidelines 10 & 11 - These MUST be updated with actual Ahmed geometry dimensions
   # Current values are estimates - UPDATE AFTER GEOMETRY INSPECTION
@@ -232,9 +232,9 @@ val: # Validation configurable parameters
 # │          Testing data Configs             │
 # └───────────────────────────────────────────┘  
 eval: # Testing configurable parameters
-  test_path: /data/ahmed_data/ahmed_data/raw_test/  # ← Only runs 451-500
-  coarse_test_path: /data/ahmed_data/ahmed_data_rans/raw/  # Coarse test data for enhanced mode
-  save_path: /data/ahmed_data/predictions/  # FIXED NVIDIA Guideline 17
+  test_path: /data/ahmed_data/organized/test/fine/
+  coarse_test_path: /data/ahmed_data/organized/test/coarse/
+  save_path: /data/ahmed_data/predictions/
   checkpoint_name: DoMINO.0.499.pt
   scaling_param_path: outputs/Ahmed_Dataset/scaling_params  # FIXED NVIDIA Guideline 19
   refine_stl: False # Automatically refine STL during inference
