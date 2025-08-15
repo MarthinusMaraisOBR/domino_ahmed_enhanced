@@ -496,7 +496,7 @@ if __name__ == "__main__":
     # Test standard dataset
     print("Testing standard dataset...")
     fm_data = OpenFoamDataset(
-        data_path="/data/ahmed_data/raw/",
+        data_path="/data/ahmed_data/processed/train/",
         kind="ahmed",
         surface_variables=["pMean", "wallShearStressMean"],
         model_type="surface"
@@ -507,8 +507,8 @@ if __name__ == "__main__":
     # Test enhanced dataset
     print("\nTesting enhanced dataset...")
     fm_data_enhanced = OpenFoamDatasetEnhanced(
-        data_path="/data/ahmed_data/raw/",
-        coarse_data_path="/data/ahmed_data_rans/raw/",
+        data_path="/data/ahmed_data/organized/train/fine/",
+        coarse_data_path="/data/ahmed_data/organized/train/coarse/",
         kind="ahmed",
         surface_variables=["pMean", "wallShearStressMean"],
         model_type="surface",
