@@ -63,7 +63,7 @@ def compute_enhanced_scaling_factors(data_dir, output_dir):
     return scaling_factors
 
 # Run computation
-data_dir = "/data/ahmed_data/ahmed_data/train/"
+data_dir = "/data/ahmed_data/processed/train/"
 output_dir = "outputs/Ahmed_Dataset/enhanced_1/"
 
 scaling_factors = compute_enhanced_scaling_factors(data_dir, output_dir)
