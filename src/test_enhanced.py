@@ -143,7 +143,7 @@ def main(cfg: DictConfig):
         return
     
     # Get paths
-    coarse_test_path = cfg.eval.get('coarse_test_path', '/data/ahmed_data_rans/raw_test/')
+    coarse_test_path = cfg.eval.get('coarse_test_path', '/data/ahmed_data/organized/test/coarse/')
     fine_test_path = cfg.eval.test_path  # For comparison if available
     save_path = cfg.eval.save_path
     
