@@ -235,8 +235,8 @@ eval: # Testing configurable parameters
   test_path: /data/ahmed_data/organized/test/fine/
   coarse_test_path: /data/ahmed_data/organized/test/coarse/
   save_path: /data/ahmed_data/predictions/
-  checkpoint_name: DoMINO.0.499.pt
-  scaling_param_path: outputs/Ahmed_Dataset/scaling_params  # FIXED NVIDIA Guideline 19
+  checkpoint_name: DoMINOEnhanced.0.499.pt
+  scaling_param_path: outputs/Ahmed_Dataset/enhanced_1
   refine_stl: False # Automatically refine STL during inference
   stencil_size: 7 # Stencil size for evaluating surface and volume model
 
