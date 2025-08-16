@@ -292,7 +292,7 @@ def main(cfg: DictConfig):
     
     # Load scaling factors
     surf_save_path = os.path.join(
-        cfg.eval.scaling_param_path, "surface_scaling_factors.npy"
+        cfg.eval.scaling_param_path, "surface_scaling_factors_inference.npy"
     )
     if os.path.exists(surf_save_path):
         surf_factors = np.load(surf_save_path).astype(np.float32)  # Ensure float32
