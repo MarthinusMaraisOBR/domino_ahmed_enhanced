@@ -46,37 +46,44 @@ def load_coarse_vtp_data(vtp_path, surface_variables):
     reader.Update()
     polydata = reader.GetOutput()
     
-    # Get cell data
-    celldata = polydata.GetCellData()
+    # Coarse data is stored as point data, need to convert to cell data
+    mesh = pv.PolyData(polydata)
+    mesh = mesh.point_data_to_cell_data()
     
-    # Extract fields with variable name mapping
+    # Get cell data after conversion
+    celldata = mesh.GetCellData()
+    
+    # Extract fields with correct variable name mapping for coarse data
     surface_fields = []
     for var_name in surface_variables:
-        # Try different possible names for coarse data
-        coarse_names = [var_name, var_name.replace('Mean', ''), 'p', 'wallShearStress']
-        
         field_found = False
-        for coarse_name in coarse_names:
-            if celldata.GetArray(coarse_name):
-                array = celldata.GetArray(coarse_name)
-                field_data = np.zeros((array.GetNumberOfTuples(), array.GetNumberOfComponents()))
-                for i in range(array.GetNumberOfTuples()):
-                    for j in range(array.GetNumberOfComponents()):
-                        field_data[i, j] = array.GetComponent(i, j)
-                surface_fields.append(field_data)
-                print(f"  Found {var_name} as {coarse_name}")
-                field_found = True
-                break
+        
+        # Map fine variable names to coarse variable names
+        if var_name == 'pMean':
+            coarse_name = 'p'
+        elif var_name == 'wallShearStressMean':
+            coarse_name = 'wallShearStress'
+        else:
+            coarse_name = var_name
+        
+        if celldata.GetArray(coarse_name):
+            array = celldata.GetArray(coarse_name)
+            field_data = np.zeros((array.GetNumberOfTuples(), array.GetNumberOfComponents()))
+            for i in range(array.GetNumberOfTuples()):
+                for j in range(array.GetNumberOfComponents()):
+                    field_data[i, j] = array.GetComponent(i, j)
+            surface_fields.append(field_data)
+            print(f"  Found {var_name} as {coarse_name}")
+            field_found = True
         
         if not field_found:
             print(f"  Warning: {var_name} not found, using zeros")
-            num_cells = polydata.GetNumberOfCells()
+            num_cells = mesh.GetNumberOfCells()
             surface_fields.append(np.zeros((num_cells, 1)))
     
     surface_fields = np.concatenate(surface_fields, axis=-1)
     
-    # Get mesh data
-    mesh = pv.PolyData(polydata)
+    # Get mesh data from converted mesh
     surface_coordinates = np.array(mesh.cell_centers().points, dtype=np.float32)
     surface_normals = np.array(mesh.cell_normals, dtype=np.float32)
     surface_sizes = mesh.compute_cell_sizes(length=False, area=True, volume=False)
@@ -90,7 +97,7 @@ def load_coarse_vtp_data(vtp_path, surface_variables):
         'fields': surface_fields,
         'normals': surface_normals,
         'areas': surface_areas,
-        'polydata': polydata
+        'polydata': mesh  # Use converted mesh
     }
 
 
@@ -224,11 +231,12 @@ def main(cfg: DictConfig):
         )
         
         # Load STL geometry
+        # Load STL geometry
         print(f"Loading geometry: {stl_path}")
         reader = pv.get_reader(stl_path)
         mesh_stl = reader.read()
-        stl_vertices = mesh_stl.points
-        stl_faces = np.array(mesh_stl.faces).reshape((-1, 4))[:, 1:]
+        stl_vertices = np.array(mesh_stl.points, dtype=np.float32)  # Force float32
+        stl_faces = np.array(mesh_stl.faces, dtype=np.int32).reshape((-1, 4))[:, 1:]
         mesh_indices_flattened = stl_faces.flatten()
         length_scale = np.amax(np.amax(stl_vertices, 0) - np.amin(stl_vertices, 0))
         stl_sizes = mesh_stl.compute_cell_sizes(length=False, area=True, volume=False)
@@ -243,8 +251,8 @@ def main(cfg: DictConfig):
             s_max = np.amax(stl_vertices, 0)
             s_min = np.amin(stl_vertices, 0)
         else:
-            s_max = np.asarray(cfg.data.bounding_box_surface.max)
-            s_min = np.asarray(cfg.data.bounding_box_surface.min)
+            s_max = np.array(cfg.data.bounding_box_surface.max, dtype=np.float32)
+            s_min = np.array(cfg.data.bounding_box_surface.min, dtype=np.float32)
         
         # Create grid for SDF
         nx, ny, nz = cfg.model.interp_res
@@ -259,9 +267,9 @@ def main(cfg: DictConfig):
             use_sign_winding_number=True,
         ).reshape(nx, ny, nz)
         
-        surf_grid = np.float32(surf_grid)
-        sdf_surf_grid = np.float32(sdf_surf_grid)
-        surf_grid_max_min = np.float32(np.asarray([s_min, s_max]))
+        surf_grid = np.array(surf_grid, dtype=np.float32)
+        sdf_surf_grid = np.array(sdf_surf_grid, dtype=np.float32)
+        surf_grid_max_min = np.array([s_min, s_max], dtype=np.float32)
         
         # Load coarse surface data
         print(f"Loading coarse surface data: {coarse_vtp_path}")
@@ -280,9 +288,10 @@ def main(cfg: DictConfig):
         pos_surface_center_of_mass = surface_coordinates - center_of_mass
         
         # Normalize coordinates
-        surface_coordinates_norm = normalize(surface_coordinates, s_max, s_min)
-        surface_neighbors_norm = normalize(surface_neighbors, s_max, s_min)
-        surf_grid_norm = normalize(surf_grid, s_max, s_min)
+        # Normalize coordinates
+        surface_coordinates_norm = np.array(normalize(surface_coordinates, s_max, s_min), dtype=np.float32)
+        surface_neighbors_norm = np.array(normalize(surface_neighbors, s_max, s_min), dtype=np.float32)
+        surf_grid_norm = np.array(normalize(surf_grid, s_max, s_min), dtype=np.float32)
         
         # Prepare data dictionary for model
         # IMPORTANT: For inference, we only provide coarse features (4 features)
