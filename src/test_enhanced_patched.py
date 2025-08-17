@@ -40,8 +40,8 @@ from physicsnemo.utils.sdf import signed_distance_field
 from enhanced_domino_model import DoMINOEnhanced
 
 # Constants
-AIR_DENSITY = 1.205
-STREAM_VELOCITY = 30.0
+AIR_DENSITY = 1.0
+STREAM_VELOCITY = 1.0
 
 
 def convert_point_to_cell_data_manual(mesh, field_name, n_components=1):
