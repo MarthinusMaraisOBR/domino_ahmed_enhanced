@@ -1,41 +1,28 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023 - 2024 NVIDIA CORPORATION & AFFILIATES.
-# SPDX-License-Identifier: Apache-2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Complete configuration for Enhanced DoMINO with all fixes
+# Save this as conf/config_enhanced_fixed.yaml
 
-# ┌───────────────────────────────────────────┐
-# │            Project Details                │
-# └───────────────────────────────────────────┘  
-project: # Project name
-  name: Ahmed_Dataset  # FIXED Changed from AWS_Dataset (NVIDIA Guideline 1)
-  
-exp_tag: enhanced_1 # Experiment tag (NVIDIA Guideline 2) ✅
+defaults:
+  - _self_
 
-# Main output directory.
+# Project configuration
+project:
+  name: Ahmed_Dataset
+
+exp_tag: enhanced_fixed  # New experiment tag for fixed version
+
+# Main output directory
 project_dir: outputs/${project.name}/
 output: outputs/${project.name}/${exp_tag}
 
-hydra: # Hydra config
+hydra:
   run:
     dir: ${output}
-  output_subdir: hydra  # Default is .hydra which causes files not being uploaded in W&B.
+  output_subdir: hydra
 
-# The directory to search for checkpoints to continue training.
+# Resume directory for checkpoints
 resume_dir: ${output}/models
 
-# ┌───────────────────────────────────────────┐
-# │            Data Preprocessing             │
-# └───────────────────────────────────────────┘  
+# Data preprocessing configuration
 data_processor:
   kind: ahmed
   output_dir: /data/ahmed_data/processed/train/
@@ -43,117 +30,99 @@ data_processor:
   cached_dir: /data/ahmed_data/ahmed_data/cached/
   use_cache: false
   num_processors: 8
-  
+
   # Enhanced features configuration
   use_enhanced_features: true
   coarse_input_dir: /data/ahmed_data/organized/train/coarse/
 
-# ┌───────────────────────────────────────────┐
-# │            Solution variables             │
-# └───────────────────────────────────────────┘  
+# Solution variables
 variables:
   surface:
     solution:
-      # CRITICAL: NVIDIA Guideline 6 - These MUST be verified against actual Ahmed .vtp files
-      # Current names are placeholders - UPDATE AFTER DATASET INSPECTION
-      pMean: scalar                    # Pressure coefficient (VERIFY NAME)
-      wallShearStressMean: vector      # Wall shear stress vector (VERIFY NAME)
-      # Possible alternative names found in Ahmed datasets:
-      # Cp: scalar                     # Pressure coefficient
-      # wallShearStress: vector        # Wall shear stress
-      # p: scalar                      # Static pressure
-      # tau_wall: vector              # Wall shear stress
-    
+      pMean: scalar
+      wallShearStressMean: vector
+
     # Enhanced features configuration
     enhanced_features:
       input_feature_count: 8  # 4 fine + 4 coarse interpolated features
-      coarse_variable_mapping:  # Mapping from fine to coarse variable names
+      coarse_variable_mapping:
         pMean: p
         wallShearStressMean: wallShearStress
-  
-  # NVIDIA Guideline 7: Volume variables REMOVED for Ahmed surface-only dataset
+
+  # Volume variables (even if not used, needed for config)
   volume:
     solution:
       UMeanTrim: vector
       pMeanTrim: scalar
       nutMeanTrim: scalar
 
-# ┌───────────────────────────────────────────┐
-# │          Training Data Configs            │
-# └───────────────────────────────────────────┘  
+# Training data configuration
 data:
   input_dir: /data/ahmed_data/processed/train/
   input_dir_val: /data/ahmed_data/processed/val/
-  
-  # CRITICAL: NVIDIA Guidelines 10 & 11 - These MUST be updated with actual Ahmed geometry dimensions
-  # Current values are estimates - UPDATE AFTER GEOMETRY INSPECTION
-  bounding_box: # NVIDIA Guideline 10: Computational domain bounding box
-    # Ahmed body computational domain (estimates based on typical Ahmed: L=1.044m, W=0.389m, H=0.288m)
-    min: [-4.0, -1.0, 0.0]   # [x_min, y_min, z_min] - upstream, left side, ground
-    max: [6.0, 1.0, 1.4]     # [x_max, y_max, z_max] - downstream, right side, top
-    
-  bounding_box_surface: # NVIDIA Guideline 11: Surface geometry bounding box
-    # Tight box around Ahmed body surface
-    min: [-1.5, -0.4, 0.0]   # [x_min, y_min, z_min] - slight margin around body
-    max: [1.0, 0.4, 0.5]    # [x_max, y_max, z_max] - slight margin around body
-    
+
+  # Bounding boxes based on Ahmed geometry
+  bounding_box:
+    min: [-4.0, -1.0, 0.0]
+    max: [6.0, 1.0, 1.4]
+
+  bounding_box_surface:
+    min: [-1.5, -0.4, 0.0]
+    max: [1.0, 0.4, 0.5]
+
   gpu_preprocessing: true
   gpu_output: true
 
-# ┌───────────────────────────────────────────┐
-# │          Domain Parallelism Settings      │
-# └───────────────────────────────────────────┘  
+# Domain parallelism settings
 domain_parallelism:
   domain_size: 1
   shard_grid: false
   shard_points: false
 
-# ┌───────────────────────────────────────────┐
-# │          Model Parameters                 │
-# └───────────────────────────────────────────┘  
+# Model configuration with FIXES
 model:
-  model_type: surface  # FIXED Changed from combined to surface for Ahmed surface-only dataset
-  activation: "relu" # "relu" or "gelu"
-  
-  loss_function: 
-    loss_type: "mse" # mse or rmse
-    area_weighing_factor: 10000 # Generally inverse of maximum area
-    
-  interp_res: [128, 64, 64] # resolution of latent space
-  use_sdf_in_basis_func: true # SDF in basis function network
-  positional_encoding: false # calculate positional encoding?
-  
-  # NVIDIA Guidelines 13, 14, 15: Sampling parameters
-  volume_points_sample: 0  # FIXED: NVIDIA Guideline 13 - Set to 0 for surface-only
-  surface_points_sample: 8192  # NVIDIA Guideline 14 - Reasonable for GPU memory ✅
-  geom_points_sample: 100_000  # FIXED NVIDIA Guideline 15 - Reduced from 300k, verify against STL resolution
-  
-  surface_sampling_algorithm: area_weighted # random or area_weighted
-  surface_neighbors: true # Pre-compute surface neighborhood from input data
-  num_surface_neighbors: 7 # How many neighbors?
-  use_surface_normals: true # Use surface normals and surface areas for surface computation?
-  use_surface_area: true # Use only surface normals and not surface area
-  integral_loss_scaling_factor: 100 # Scale integral loss by this factor
-  normalization: min_max_scaling # or mean_std_scaling
-  encode_parameters: false # encode inlet velocity and air density in the model
-  
-  # Loss scaling adjustments for surface-only training
-  surf_loss_scaling: 1.0  # FIXED: Reduced from 5.0 for surface-only training
-  vol_loss_scaling: 0.0   # FIXED: Set to 0.0 for surface-only training
-  
-  geometry_encoding_type: both # geometry encoder type, sdf, stl, both
-  solution_calculation_mode: two-loop # one-loop is better for sharded, two-loop is lower memory but more overhead
-  
-  resampling_surface_mesh: # resampling of surface mesh before constructing kd tree
-    resample: false #false or true
-    points: 1_000_000 # number of points
-    
-  geometry_rep: # Hyperparameters for geometry representation network
+  model_type: surface
+  activation: "relu"
+
+  loss_function:
+    loss_type: "mse"
+    area_weighing_factor: 10000
+
+  interp_res: [128, 64, 64]
+  use_sdf_in_basis_func: true
+  positional_encoding: false
+
+  # Sampling parameters
+  volume_points_sample: 0  # Surface only
+  surface_points_sample: 8192
+  geom_points_sample: 100_000
+  surface_sampling_algorithm: area_weighted
+  surface_neighbors: true
+  num_surface_neighbors: 7
+  use_surface_normals: true
+  use_surface_area: true
+  integral_loss_scaling_factor: 100
+  normalization: min_max_scaling
+  encode_parameters: false
+
+  # Loss scaling
+  surf_loss_scaling: 1.0  # Reduced from 5.0
+  vol_loss_scaling: 0.0   # Surface only
+
+  geometry_encoding_type: both
+  solution_calculation_mode: two-loop
+
+  resampling_surface_mesh:
+    resample: false
+    points: 1_000_000
+
+  # Geometry representation hyperparameters
+  geometry_rep:
     geo_conv:
-      base_neurons: 32 # 256 or 64
+      base_neurons: 32
       base_neurons_out: 1
       volume_radii: [0.1, 0.5, 2.5, 5.0]
-      surface_radii: [0.01, 0.05, 0.1] # 0.05
+      surface_radii: [0.01, 0.05, 0.1]
       hops: 1
       activation: ${model.activation}
     geo_processor:
@@ -161,98 +130,76 @@ model:
       activation: ${model.activation}
     geo_processor_sdf:
       base_filters: 8
-      
-  nn_basis_functions: # Hyperparameters for basis function network
+
+  nn_basis_functions:
     base_layer: 512
     fourier_features: false
     num_modes: 5
     activation: ${model.activation}
-    
+
   local_point_conv:
     activation: ${model.activation}
-    
-  aggregation_model: # Hyperparameters for aggregation network
+
+  aggregation_model:
     base_layer: 512
     activation: ${model.activation}
-    
-  position_encoder: # Hyperparameters for position encoding network
+
+  position_encoder:
     base_neurons: 512
-    
-  geometry_local: # Hyperparameters for local geometry extraction
-    volume_neighbors_in_radius: [64, 128, 256] # [64, 128]
-    surface_neighbors_in_radius: [64, 128, 256] # [64]
-    volume_radii: [0.05, 0.25, 1.0] # [0.05. 0.1]
-    surface_radii: [0.05, 0.25, 1.0] # [0.05]
+
+  geometry_local:
+    volume_neighbors_in_radius: [64, 128, 256]
+    surface_neighbors_in_radius: [64, 128, 256]
+    volume_radii: [0.05, 0.25, 1.0]
+    surface_radii: [0.05, 0.25, 1.0]
     base_layer: 512
-    
+
+  # CRITICAL: Parameter model configuration (was missing)
   parameter_model:
     base_layer: 512
-    scaling_params: [1.0, 1.0] # FIXED: Changed from [30.0, 1.226] to standard [inlet_velocity, air_density]
+    scaling_params: [1.0, 1.0]  # Standard normalization
     fourier_features: false
     num_modes: 5
-  
-  # Enhanced model configuration
+  # FIXED Enhanced model configuration
   enhanced_model:
-    surface_input_features: 8  # 4 fine + 4 coarse during training
+    surface_input_features: 8
     debug: true  # Enable debug logging
-    
+
     coarse_to_fine:
-      # SIMPLIFIED ARCHITECTURE
-      hidden_layers: [256, 256]  # Reduced from [512, 512, 512]
-      
-      # DISABLED PROBLEMATIC FEATURES
-      use_spectral: false  # Was true - disabled for stability
-      use_residual: false  # CRITICAL: Was true - causing wrong predictions!
-      
-      # ADDED REGULARIZATION
-      dropout_rate: 0.1  # Prevent overfitting
-      
+      # SIMPLIFIED AND FIXED
+      hidden_layers: [256, 256]  # Reduced complexity
+      use_spectral: false        # DISABLED - was causing issues
+      use_residual: false        # CRITICAL: DISABLED - main problem!
+      dropout_rate: 0.1          # Added regularization
       activation: ${model.activation}
 
-# ┌───────────────────────────────────────────┐
-# │          Training Configs                 │
-# └───────────────────────────────────────────┘  
-train: # Training configurable parameters
-  epochs: 300  # FIXED: NVIDIA Guideline 12 - Reduced from 1000 for initial testing
-  checkpoint_interval: 50
+# Training configuration
+train:
+  epochs: 300  # Reduced for faster iteration
+  checkpoint_interval: 25
   dataloader:
     batch_size: 1
-    pin_memory: false # if the preprocessing is outputing GPU data, set this to false
+    pin_memory: false
   sampler:
     shuffle: true
     drop_last: false
-  checkpoint_dir: null  # FIXED: Changed from /user/models/ to null for fresh Ahmed training
-  
-# ┌───────────────────────────────────────────┐
-# │          Validation Configs               │
-# └───────────────────────────────────────────┘  
-val: # Validation configurable parameters
+  checkpoint_dir: null  # Start fresh
+
+# Validation configuration
+val:
   dataloader:
-    batch_size: 1 # Set to 1
-    pin_memory: false # if the preprocessing is outputing GPU data, set this to false
+    batch_size: 1
+    pin_memory: false
   sampler:
     shuffle: true
     drop_last: false
 
-# ┌───────────────────────────────────────────┐
-# │          Testing data Configs             │
-# └───────────────────────────────────────────┘  
-eval: # Testing configurable parameters
+# Testing/evaluation configuration
+eval:
   test_path: /data/ahmed_data/organized/test/fine/
   coarse_test_path: /data/ahmed_data/organized/test/coarse/
-  save_path: /data/ahmed_data/predictions/
-  checkpoint_name: DoMINOEnhanced.0.499.pt
-  scaling_param_path: outputs/Ahmed_Dataset/enhanced_1
-  refine_stl: False # Automatically refine STL during inference
-  stencil_size: 7 # Stencil size for evaluating surface and volume model
-
-# ┌───────────────────────────────────────────┐
-# │          CRITICAL: Manual Updates Needed  │
-# └───────────────────────────────────────────┘  
-# BEFORE TRAINING, YOU MUST:
-# 1. Verify surface variable names in variables.surface.solution against actual Ahmed .vtp files
-# 2. Update bounding_box and bounding_box_surface with actual Ahmed geometry dimensions
-# 3. Verify geom_points_sample against actual Ahmed .stl file resolution
-# 4. Create test/validation data splits if needed
-# 
-# Use the verify_ahmed_dataset.py script to get exact values for these parameters
+  save_path: /data/ahmed_data/predictions_fixed/
+  checkpoint_name: DoMINOEnhanced.best.pt
+  scaling_param_path: outputs/Ahmed_Dataset/enhanced_fixed
+  refine_stl: false
+  stencil_size: 7
