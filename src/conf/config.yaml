@@ -193,21 +193,27 @@ model:
   
   # Enhanced model configuration
   enhanced_model:
-    surface_input_features: 8  # 4 fine + 4 coarse features
-    coarse_feature_processor:
-      hidden_layers: [256, 128]
-      activation: ${model.activation}
+    surface_input_features: 8  # 4 fine + 4 coarse during training
+    debug: true  # Enable debug logging
+    
     coarse_to_fine:
-      hidden_layers: [512, 512, 512]  # Match your implementation
-      use_spectral: true              # Enable spectral features
-      use_residual: true              # Enable residual connections
-      activation: ${model.activation} # Inherit main activation
+      # SIMPLIFIED ARCHITECTURE
+      hidden_layers: [256, 256]  # Reduced from [512, 512, 512]
+      
+      # DISABLED PROBLEMATIC FEATURES
+      use_spectral: false  # Was true - disabled for stability
+      use_residual: false  # CRITICAL: Was true - causing wrong predictions!
+      
+      # ADDED REGULARIZATION
+      dropout_rate: 0.1  # Prevent overfitting
+      
+      activation: ${model.activation}
 
 # ┌───────────────────────────────────────────┐
 # │          Training Configs                 │
 # └───────────────────────────────────────────┘  
 train: # Training configurable parameters
-  epochs: 500  # FIXED: NVIDIA Guideline 12 - Reduced from 1000 for initial testing
+  epochs: 300  # FIXED: NVIDIA Guideline 12 - Reduced from 1000 for initial testing
   checkpoint_interval: 50
   dataloader:
     batch_size: 1
