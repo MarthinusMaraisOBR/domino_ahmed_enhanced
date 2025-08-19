@@ -199,7 +199,7 @@ eval:
   test_path: /data/ahmed_data/organized/test/fine/
   coarse_test_path: /data/ahmed_data/organized/test/coarse/
   save_path: /data/ahmed_data/predictions_fixed/
-  checkpoint_name: DoMINOEnhanced.best.pt
+  checkpoint_name: DoMINOEnhanced.0.299.pt  # final checkpoint
   scaling_param_path: outputs/Ahmed_Dataset/enhanced_fixed
   refine_stl: false
   stencil_size: 7
