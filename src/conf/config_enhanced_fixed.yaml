@@ -175,7 +175,7 @@ model:
 
 # Training configuration
 train:
-  epochs: 300  # Reduced for faster iteration
+  epochs: 500  # Reduced for faster iteration
   checkpoint_interval: 25
   dataloader:
     batch_size: 1

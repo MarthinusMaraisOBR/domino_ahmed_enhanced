@@ -719,6 +719,10 @@ def main(cfg: DictConfig):
                 surface_normals = coarse_data['normals']
                 
                 # Coarse forces
+                # Ensure arrays are numpy
+                if torch.is_tensor(prediction_surf):
+                    prediction_surf = prediction_surf.cpu().numpy()
+                
                 coarse_force_x = np.sum(
                     coarse_data['fields'][:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
                     - coarse_data['fields'][:, 1] * surface_areas[:, 0]

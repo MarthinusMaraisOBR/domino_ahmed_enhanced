@@ -712,7 +712,7 @@ def main(cfg: DictConfig):
             print(f"Prediction completed in {elapsed_time:.2f} seconds")
             
             if prediction_surf is not None:
-                prediction_surf = prediction_surf[0] if isinstance(prediction_surf, np.ndarray) else prediction_surf[0].cpu().numpy()  # Remove batch dimension
+                prediction_surf = prediction_surf[0]  # Remove batch dimension
                 
                 # Now all arrays have the same dimensions - calculate forces
                 surface_areas = coarse_data['areas'].reshape(-1, 1)
