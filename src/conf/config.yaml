@@ -94,8 +94,8 @@ model:
 
   # Sampling parameters
   volume_points_sample: 0  # Surface only
-  surface_points_sample: 8192
-  geom_points_sample: 100_000
+  surface_points_sample: 32768
+  geom_points_sample: 500_000
   surface_sampling_algorithm: area_weighted
   surface_neighbors: true
   num_surface_neighbors: 7
@@ -119,7 +119,7 @@ model:
   # Geometry representation hyperparameters
   geometry_rep:
     geo_conv:
-      base_neurons: 32
+      base_neurons: 64
       base_neurons_out: 1
       volume_radii: [0.1, 0.5, 2.5, 5.0]
       surface_radii: [0.01, 0.05, 0.1]
@@ -169,13 +169,13 @@ model:
       # SIMPLIFIED AND FIXED
       hidden_layers: [256, 256]  # Reduced complexity
       use_spectral: false        # DISABLED - was causing issues
-      use_residual: false        # CRITICAL: DISABLED - main problem!
+      use_residual: true        # CRITICAL: DISABLED - main problem!
       dropout_rate: 0.1          # Added regularization
       activation: ${model.activation}
 
 # Training configuration
 train:
-  epochs: 500  # Reduced for faster iteration
+  epochs: 200  # Reduced for faster iteration
   checkpoint_interval: 25
   dataloader:
     batch_size: 1

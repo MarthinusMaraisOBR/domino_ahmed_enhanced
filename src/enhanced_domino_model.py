@@ -125,11 +125,11 @@ class CoarseToFineModel(nn.Module):
         input_dim: int = 4,  # Coarse flow features
         output_dim: int = 4,  # Fine flow features  
         encoding_dim: int = 448,  # Geometry encoding dimension
-        hidden_layers: list = [256, 256],  # REDUCED from [512, 512, 512]
+        hidden_layers: list = [256, 256],  # Network architecture
         activation: str = "relu",
-        use_spectral: bool = False,  # DISABLED by default
-        use_residual: bool = True,  # CRITICAL: DISABLED to fix predictions
-        dropout_rate: float = 0.1,  # Added dropout
+        use_spectral: bool = False,  # Spectral features
+        use_residual: bool = True,  # FIXED: Now enabled by default with proper implementation
+        dropout_rate: float = 0.1,  # Regularization
     ):
         super().__init__()
         
@@ -137,30 +137,30 @@ class CoarseToFineModel(nn.Module):
         self.output_dim = output_dim
         self.use_residual = use_residual
         
-        print(f"[CoarseToFineModel] Initializing with:")
+        print(f"[CoarseToFineModel] Initializing FIXED architecture:")
         print(f"  - Input dim: {input_dim}")
         print(f"  - Output dim: {output_dim}")
         print(f"  - Encoding dim: {encoding_dim}")
         print(f"  - Hidden layers: {hidden_layers}")
         print(f"  - Use spectral: {use_spectral}")
-        print(f"  - Use residual: {use_residual} {'⚠️ DISABLED - was causing issues' if not use_residual else ''}")
+        print(f"  - Use residual: {use_residual} {'✅ ENABLED with learnable weighting' if use_residual else '⚠️ DISABLED'}")
         
         # Feature extractor for coarse flow data
         self.coarse_feature_extractor = FullyConnected(
             in_features=input_dim,
-            out_features=128,  # Reduced from 256
-            num_layers=2,  # Reduced from 3
+            out_features=128,
+            num_layers=2,
             layer_size=128,
             activation=activation,
             dropout_rate=dropout_rate,
         )
         
-        # Spectral feature extraction (disabled by default)
+        # Spectral feature extraction (optional)
         if use_spectral:
             self.spectral_layer = SpectralFeatureExtractor(
                 in_features=input_dim,
-                out_features=64,  # Reduced from 128
-                num_frequencies=8,  # Reduced from 16
+                out_features=64,
+                num_frequencies=8,
             )
             feature_dim = 128 + 64
         else:
@@ -170,7 +170,7 @@ class CoarseToFineModel(nn.Module):
         # Combine with geometry encoding
         fusion_input_dim = feature_dim + encoding_dim
         
-        # Main processing network (simplified)
+        # Main processing network
         layers = []
         in_features = fusion_input_dim
         
@@ -193,34 +193,53 @@ class CoarseToFineModel(nn.Module):
         
         self.main_network = nn.Sequential(*layers)
         
-        # Output projection (simplified)
+        # CRITICAL FIX: Output projection WITHOUT Tanh activation
+        # This predicts the CORRECTION/REFINEMENT, not absolute values
         self.output_projection = nn.Linear(hidden_layers[-1], output_dim)
         
-        # Residual connection (DISABLED by default)
+        # FIXED RESIDUAL IMPLEMENTATION
         if use_residual:
-            print("  ⚠️ WARNING: Residual connection is enabled - may cause issues!")
-            self.residual_projection = nn.Linear(input_dim, output_dim)
-            # Initialize near zero to reduce impact
-            nn.init.xavier_uniform_(self.residual_projection.weight, gain=0.1)
-            nn.init.zeros_(self.residual_projection.bias)
+            # Learnable residual weight - starts small to ensure stability
+            # This will be learned during training to find optimal blend
+            self.residual_weight = nn.Parameter(torch.tensor(0.9))  # Start with strong input contribution
+            self.correction_weight = nn.Parameter(torch.tensor(0.1))  # Start with weak correction
+            
+            # Optional: Learn a projection for the residual path if dimensions don't match
+            if input_dim != output_dim:
+                self.residual_projection = nn.Linear(input_dim, output_dim)
+                nn.init.eye_(self.residual_projection.weight)  # Initialize as identity-like
+                nn.init.zeros_(self.residual_projection.bias)
+            else:
+                self.residual_projection = nn.Identity()
+            
+            print(f"  - Residual weights: input={0.9:.2f}, correction={0.1:.2f} (learnable)")
         
-        # Better weight initialization
-        self._initialize_weights()
-
-        # Add learnable residual weight
-        self.residual_weight = nn.Parameter(torch.tensor(0.1))
+        # Initialize weights properly for refinement learning
+        self._initialize_weights_for_refinement()
         
-    def _initialize_weights(self):
-        """Initialize weights for better training."""
+    def _initialize_weights_for_refinement(self):
+        """Initialize weights specifically for learning refinements, not absolute predictions."""
         for module in self.modules():
             if isinstance(module, (nn.Linear, WeightNormLinear)):
-                if hasattr(module, 'weight_v'):
-                    nn.init.xavier_uniform_(module.weight_v, gain=0.5)
-                elif hasattr(module, 'weight'):
-                    nn.init.xavier_uniform_(module.weight, gain=0.5)
-                if hasattr(module, 'bias') and module.bias is not None:
-                    nn.init.zeros_(module.bias)
-    
+                # Skip residual projection (already initialized as identity)
+                if module == getattr(self, 'residual_projection', None):
+                    continue
+                    
+                # Initialize output projection to produce small corrections initially
+                if module == self.output_projection:
+                    if hasattr(module, 'weight'):
+                        nn.init.xavier_uniform_(module.weight, gain=0.01)  # Very small initial corrections
+                    if hasattr(module, 'bias') and module.bias is not None:
+                        nn.init.zeros_(module.bias)
+                else:
+                    # Standard initialization for other layers
+                    if hasattr(module, 'weight_v'):
+                        nn.init.xavier_uniform_(module.weight_v, gain=0.5)
+                    elif hasattr(module, 'weight'):
+                        nn.init.xavier_uniform_(module.weight, gain=0.5)
+                    if hasattr(module, 'bias') and module.bias is not None:
+                        nn.init.zeros_(module.bias)
+
     def forward(
         self, 
         coarse_features: torch.Tensor,
@@ -228,6 +247,8 @@ class CoarseToFineModel(nn.Module):
     ) -> torch.Tensor:
         """
         Map coarse features to fine features using geometry information.
+        
+        FIXED APPROACH: Learn refinements/corrections rather than absolute values.
         
         Args:
             coarse_features: Coarse resolution features (B, N, 4)
@@ -248,20 +269,46 @@ class CoarseToFineModel(nn.Module):
             spectral_features = self.spectral_layer(coarse_features)
             coarse_processed = torch.cat([coarse_processed, spectral_features], dim=-1)
         
-        # Combine with geometry
+        # Combine with geometry encoding
         combined_features = torch.cat([coarse_processed, geometry_encoding], dim=-1)
         
         # Process through main network
         processed = self.main_network(combined_features)
         
-        # Generate fine resolution output
-        fine_prediction = self.output_projection(processed)
+        # Generate CORRECTION/REFINEMENT (not absolute prediction)
+        correction = self.output_projection(processed)
         
-        # Add residual if enabled (NOT RECOMMENDED)
+        # CRITICAL FIX: Proper residual connection with learnable weights
         if self.use_residual:
-            residual = self.residual_projection(coarse_features)
-            # Scale down residual to reduce impact
-            fine_prediction = fine_prediction + 0.1 * residual
+            # Project input if needed (usually identity)
+            residual_features = self.residual_projection(coarse_features)
+            
+            # Learnable weighted combination:
+            # output = α * input + β * correction
+            # where α and β are learned to balance input preservation vs refinement
+            fine_prediction = (
+                self.residual_weight * residual_features + 
+                self.correction_weight * correction
+            )
+            
+            # Optional: Add sigmoid gating to ensure weights stay reasonable
+            # This prevents the pathological 2x scaling issue
+            if self.training:
+                # Clamp weights during training to prevent instability
+                self.residual_weight.data = torch.clamp(self.residual_weight.data, 0.5, 1.5)
+                self.correction_weight.data = torch.clamp(self.correction_weight.data, -0.5, 0.5)
+        else:
+            # Without residual, just use the correction as absolute prediction
+            # NOT RECOMMENDED - this is what caused your 2x scaling issue
+            fine_prediction = correction
+            print("⚠️ WARNING: Running without residual connection - may lead to scaling issues!")
+        
+        # Debug logging for monitoring
+        if self.training and torch.rand(1).item() < 0.01:
+            print(f"  Residual weight: {self.residual_weight.item():.3f}")
+            print(f"  Correction weight: {self.correction_weight.item():.3f}")
+            print(f"  Correction magnitude: {correction.abs().mean():.4f}")
+            print(f"  Output stats: mean={fine_prediction.mean():.4f}, std={fine_prediction.std():.4f}")
         
         return fine_prediction
 

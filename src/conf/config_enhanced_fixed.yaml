@@ -169,7 +169,7 @@ model:
       # SIMPLIFIED AND FIXED
       hidden_layers: [256, 256]  # Reduced complexity
       use_spectral: false        # DISABLED - was causing issues
-      use_residual: false        # CRITICAL: DISABLED - main problem!
+      use_residual: true        # CRITICAL: DISABLED - main problem!
       dropout_rate: 0.1          # Added regularization
       activation: ${model.activation}
 
