@@ -128,7 +128,7 @@ class CoarseToFineModel(nn.Module):
         hidden_layers: list = [256, 256],  # REDUCED from [512, 512, 512]
         activation: str = "relu",
         use_spectral: bool = False,  # DISABLED by default
-        use_residual: bool = False,  # CRITICAL: DISABLED to fix predictions
+        use_residual: bool = True,  # CRITICAL: DISABLED to fix predictions
         dropout_rate: float = 0.1,  # Added dropout
     ):
         super().__init__()
@@ -194,10 +194,7 @@ class CoarseToFineModel(nn.Module):
         self.main_network = nn.Sequential(*layers)
         
         # Output projection (simplified)
-        self.output_projection = nn.Sequential(
-            nn.Linear(hidden_layers[-1], output_dim),
-            nn.Tanh()  # Added to bound outputs
-        )
+        self.output_projection = nn.Linear(hidden_layers[-1], output_dim)
         
         # Residual connection (DISABLED by default)
         if use_residual:
@@ -209,6 +206,9 @@ class CoarseToFineModel(nn.Module):
         
         # Better weight initialization
         self._initialize_weights()
+
+        # Add learnable residual weight
+        self.residual_weight = nn.Parameter(torch.tensor(0.1))
         
     def _initialize_weights(self):
         """Initialize weights for better training."""
