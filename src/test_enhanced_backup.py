@@ -714,86 +714,114 @@ def main(cfg: DictConfig):
                 surface_areas = coarse_data['areas'].reshape(-1, 1)
                 surface_normals = coarse_data['normals']
                 
-                # Calculate integrated force coefficients (no need for frontal area)
-                # The coefficients are already non-dimensional
-                print(f"\nIntegrated Coefficient Comparison:")
-
-                # Integrated drag coefficient (Cdx)
-                Cdx_coarse = np.sum(
+                # Coarse forces
+                coarse_force_x = np.sum(
                     coarse_data['fields'][:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
                     - coarse_data['fields'][:, 1] * surface_areas[:, 0]
                 )
-                Cdx_fine = np.sum(
-                    fine_data['fields'][:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
-                    - fine_data['fields'][:, 1] * surface_areas[:, 0]
-                )
-                Cdx_pred = np.sum(
-                    prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
-                    - prediction_surf[:, 1] * surface_areas[:, 0]
-                )
-
-                print(f"  Integrated Drag Coefficient:")
-                print(f"    Coarse:    {Cdx_coarse:.6f}")
-                print(f"    Fine:      {Cdx_fine:.6f}")
-                print(f"    Predicted: {Cdx_pred:.6f}")
-
-                # Calculate improvement
-                coarse_to_fine_drag_error = abs(Cdx_coarse - Cdx_fine)
-                pred_to_fine_drag_error = abs(Cdx_pred - Cdx_fine)
-                if coarse_to_fine_drag_error > 1e-10:
-                    drag_improvement = (coarse_to_fine_drag_error - pred_to_fine_drag_error) / coarse_to_fine_drag_error * 100
-                else:
-                    drag_improvement = 0.0
-
-                print(f"    Baseline error: {coarse_to_fine_drag_error:.6f}")
-                print(f"    Prediction error: {pred_to_fine_drag_error:.6f}")
-                print(f"    Improvement: {drag_improvement:.1f}%")
-
-                # Integrated lift coefficient (Clz)
-                Clz_coarse = np.sum(
+                coarse_force_z = np.sum(
                     coarse_data['fields'][:, 0] * surface_normals[:, 2] * surface_areas[:, 0]
                     - coarse_data['fields'][:, 3] * surface_areas[:, 0]
                 )
-                Clz_fine = np.sum(
+                
+                # Fine forces (interpolated ground truth)
+                fine_force_x = np.sum(
+                    fine_data['fields'][:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
+                    - fine_data['fields'][:, 1] * surface_areas[:, 0]
+                )
+                fine_force_z = np.sum(
                     fine_data['fields'][:, 0] * surface_normals[:, 2] * surface_areas[:, 0]
                     - fine_data['fields'][:, 3] * surface_areas[:, 0]
                 )
-                Clz_pred = np.sum(
+                
+                # Predicted forces
+                pred_force_x = np.sum(
+                    prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
+                    - prediction_surf[:, 1] * surface_areas[:, 0]
+                )
+                pred_force_z = np.sum(
                     prediction_surf[:, 0] * surface_normals[:, 2] * surface_areas[:, 0]
                     - prediction_surf[:, 3] * surface_areas[:, 0]
                 )
-
-                print(f"\n  Integrated Lift Coefficient:")
-                print(f"    Coarse:    {Clz_coarse:.6f}")
-                print(f"    Fine:      {Clz_fine:.6f}")
-                print(f"    Predicted: {Clz_pred:.6f}")
-
-                # Calculate improvement
-                coarse_to_fine_lift_error = abs(Clz_coarse - Clz_fine)
-                pred_to_fine_lift_error = abs(Clz_pred - Clz_fine)
-                if coarse_to_fine_lift_error > 1e-10:
-                    lift_improvement = (coarse_to_fine_lift_error - pred_to_fine_lift_error) / coarse_to_fine_lift_error * 100
-                else:
-                    lift_improvement = 0.0
-
-                print(f"    Baseline error: {coarse_to_fine_lift_error:.6f}")
-                print(f"    Prediction error: {pred_to_fine_lift_error:.6f}")
+                
+                print(f"\nForce Comparison:")
+                print(f"  Drag Forces:")
+                print(f"    Coarse:       {coarse_force_x:.6f} N")
+                print(f"    Fine (Interp): {fine_force_x:.6f} N")
+                print(f"    Predicted:    {pred_force_x:.6f} N")
+                
+                # Calculate errors
+                coarse_to_fine_drag_error = abs(coarse_force_x - fine_force_x)
+                pred_to_fine_drag_error = abs(pred_force_x - fine_force_x)
+                drag_improvement = (coarse_to_fine_drag_error - pred_to_fine_drag_error) / coarse_to_fine_drag_error * 100
+                
+                print(f"    Coarse vs Fine error: {coarse_to_fine_drag_error:.6f} N")
+                print(f"    Pred vs Fine error:   {pred_to_fine_drag_error:.6f} N")
+                print(f"    Improvement: {drag_improvement:.1f}%")
+                
+                print(f"  Lift Forces:")
+                print(f"    Coarse:       {coarse_force_z:.6f} N")
+                print(f"    Fine (Interp): {fine_force_z:.6f} N")
+                print(f"    Predicted:    {pred_force_z:.6f} N")
+                
+                # Calculate errors
+                coarse_to_fine_lift_error = abs(coarse_force_z - fine_force_z)
+                pred_to_fine_lift_error = abs(pred_force_z - fine_force_z)
+                lift_improvement = (coarse_to_fine_lift_error - pred_to_fine_lift_error) / coarse_to_fine_lift_error * 100
+                
+                print(f"    Coarse vs Fine error: {coarse_to_fine_lift_error:.6f} N")
+                print(f"    Pred vs Fine error:   {pred_to_fine_lift_error:.6f} N")
                 print(f"    Improvement: {lift_improvement:.1f}%")
-
-                # Store results with coefficient naming
+                
+                # Store results
                 results_summary.append({
                     'case': dirname,
                     'case_number': tag,
-                    'drag_coeff_coarse': Cdx_coarse,
-                    'drag_coeff_fine': Cdx_fine,
-                    'drag_coeff_pred': Cdx_pred,
+                    'drag_coarse': coarse_force_x,
+                    'drag_fine': fine_force_x,
+                    'drag_pred': pred_force_x,
                     'drag_improvement': drag_improvement,
-                    'lift_coeff_coarse': Clz_coarse,
-                    'lift_coeff_fine': Clz_fine,
-                    'lift_coeff_pred': Clz_pred,
+                    'lift_coarse': coarse_force_z,
+                    'lift_fine': fine_force_z,
+                    'lift_pred': pred_force_z,
                     'lift_improvement': lift_improvement,
                     'processing_time': elapsed_time
                 })
+                
+                # Save comprehensive VTP with all fields
+                print(f"Saving comprehensive VTP: {vtp_comprehensive_save_path}")
+                save_comprehensive_vtp(
+                    output_path=vtp_comprehensive_save_path,
+                    base_mesh=reference_mesh,
+                    coarse_fields=coarse_data['fields'],
+                    fine_fields_interpolated=fine_data['fields'],
+                    predicted_fields=prediction_surf,
+                    surface_variable_names=surface_variable_names,
+                    coarse_info=coarse_data['field_info'],
+                    fine_info=fine_data['field_info']
+                )
+                
+                # Calculate field statistics
+                pressure_rmse = np.sqrt(np.mean((prediction_surf[:, 0] - fine_data['fields'][:, 0])**2))
+                shear_rmse = np.sqrt(np.mean((prediction_surf[:, 1:4] - fine_data['fields'][:, 1:4])**2))
+                
+                # Calculate baseline errors
+                pressure_rmse_baseline = np.sqrt(np.mean((coarse_data['fields'][:, 0] - fine_data['fields'][:, 0])**2))
+                shear_rmse_baseline = np.sqrt(np.mean((coarse_data['fields'][:, 1:4] - fine_data['fields'][:, 1:4])**2))
+                
+                # Calculate improvements
+                pressure_improvement = (pressure_rmse_baseline - pressure_rmse) / pressure_rmse_baseline * 100
+                shear_improvement = (shear_rmse_baseline - shear_rmse) / shear_rmse_baseline * 100
+                
+                print(f"\nField Quality Metrics:")
+                print(f"  Pressure RMSE:")
+                print(f"    Coarse baseline: {pressure_rmse_baseline:.6f}")
+                print(f"    Predicted:       {pressure_rmse:.6f}")
+                print(f"    Improvement:     {pressure_improvement:.1f}%")
+                print(f"  Wall Shear RMSE:")
+                print(f"    Coarse baseline: {shear_rmse_baseline:.6f}")
+                print(f"    Predicted:       {shear_rmse:.6f}")
+                print(f"    Improvement:     {shear_improvement:.1f}%")
                 
         except Exception as e:
             print(f"  ❌ Error processing {dirname}: {str(e)}")
@@ -808,16 +836,15 @@ def main(cfg: DictConfig):
     print(f"Successfully processed: {len(results_summary)}/5 test cases")
     
     if results_summary:
-        # Change the headers from "Force Predictions" to "Coefficient Predictions"
-        print(f"\nCoefficient Predictions Summary:")
-        print(f"{'Case':<8} {'Coarse Cd':<12} {'Fine Cd':<12} {'Pred Cd':<12} {'Improvement':<12}")
-        print(f"{'':8} {'Coarse Cl':<12} {'Fine Cl':<12} {'Pred Cl':<12} {'Improvement':<12}")
+        print(f"\nForce Predictions Comprehensive Summary:")
+        print(f"{'Case':<8} {'Coarse Drag':<12} {'Fine Drag':<12} {'Pred Drag':<12} {'Improvement':<12}")
+        print(f"{'':8} {'Coarse Lift':<12} {'Fine Lift':<12} {'Pred Lift':<12} {'Improvement':<12}")
         print("-" * 80)
         for result in results_summary:
-            print(f"{result['case']:<8} {result['drag_coeff_coarse']:<12.6f} "
-                f"{result['drag_coeff_fine']:<12.6f} {result['drag_coeff_pred']:<12.6f} {result['drag_improvement']:<12.1f}%")
-            print(f"{'':8} {result['lift_coeff_coarse']:<12.6f} "
-                f"{result['lift_coeff_fine']:<12.6f} {result['lift_coeff_pred']:<12.6f} {result['lift_improvement']:<12.1f}%")
+            print(f"{result['case']:<8} {result['drag_coarse']:<12.6f} "
+                  f"{result['drag_fine']:<12.6f} {result['drag_pred']:<12.6f} {result['drag_improvement']:<12.1f}%")
+            print(f"{'':8} {result['lift_coarse']:<12.6f} "
+                  f"{result['lift_fine']:<12.6f} {result['lift_pred']:<12.6f} {result['lift_improvement']:<12.1f}%")
             print()
         
         # Calculate average improvements
