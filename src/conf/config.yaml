@@ -1,5 +1,5 @@
-# Complete configuration for Enhanced DoMINO with all fixes
-# Save this as conf/config_enhanced_fixed.yaml
+# Complete configuration for Enhanced DoMINO with physics-aware training
+# Save this as conf/config_enhanced_v2.yaml
 
 defaults:
   - _self_
@@ -8,7 +8,7 @@ defaults:
 project:
   name: Ahmed_Dataset
 
-exp_tag: enhanced_fixed  # New experiment tag for fixed version
+exp_tag: enhanced_v2_physics  # New tag for physics-aware version
 
 # Main output directory
 project_dir: outputs/${project.name}/
@@ -79,10 +79,13 @@ domain_parallelism:
   shard_grid: false
   shard_points: false
 
-# Model configuration with FIXES
+# Model configuration with PHYSICS-AWARE FIXES
 model:
   model_type: surface
-  activation: "relu"
+  activation: "gelu"  # Changed from relu for smoother gradients
+  
+  # ENABLE PHYSICS-AWARE LOSS
+  use_physics_loss: true  # NEW: Enable physics-aware training
 
   loss_function:
     loss_type: "mse"
@@ -105,8 +108,8 @@ model:
   normalization: min_max_scaling
   encode_parameters: false
 
-  # Loss scaling
-  surf_loss_scaling: 1.0  # Reduced from 5.0
+  # Loss scaling - reduced for physics loss
+  surf_loss_scaling: 0.5  # Further reduced for physics loss
   vol_loss_scaling: 0.0   # Surface only
 
   geometry_encoding_type: both
@@ -154,36 +157,62 @@ model:
     surface_radii: [0.05, 0.25, 1.0]
     base_layer: 512
 
-  # CRITICAL: Parameter model configuration (was missing)
+  # Parameter model configuration
   parameter_model:
     base_layer: 512
-    scaling_params: [1.0, 1.0]  # Standard normalization
+    scaling_params: [1.0, 1.0]
     fourier_features: false
     num_modes: 5
-  # FIXED Enhanced model configuration
+
+  # ENHANCED MODEL V2 - Physics-aware configuration
   enhanced_model:
     surface_input_features: 8
-    debug: true  # Enable debug logging
+    debug: false  # Reduce logging after testing
+    monitor_training: true  # Enable training monitoring
 
     coarse_to_fine:
-      # SIMPLIFIED AND FIXED
-      hidden_layers: [256, 256]  # Reduced complexity
-      use_spectral: false        # DISABLED - was causing issues
-      use_residual: true        # CRITICAL: DISABLED - main problem!
-      dropout_rate: 0.1          # Added regularization
-      activation: ${model.activation}
+      # Simplified architecture for stable training
+      hidden_layers: [256, 128]
+      use_spectral: false  # Disabled for simplicity
+      use_residual: true   # ENABLED with proper constraints
+      dropout_rate: 0.2    # Increased regularization
+      activation: gelu     # Smoother gradients
+      
+      # NEW: Weight constraints for physics-aware training
+      residual_weight_min: 0.7    # Minimum residual weight
+      residual_weight_max: 1.0    # Maximum residual weight
+      correction_weight_max: 0.3  # Maximum correction weight
 
-# Training configuration
+# Training configuration - OPTIMIZED FOR PHYSICS LOSS
 train:
-  epochs: 200  # Reduced for faster iteration
-  checkpoint_interval: 25
+  epochs: 400
+  checkpoint_interval: 10  # Save more frequently
+  learning_rate: 0.0001   # NEW: Lower learning rate for physics loss
+  
   dataloader:
-    batch_size: 1
+    batch_size: 1  # MUST be 1 due to ball query limitation
     pin_memory: false
+    
   sampler:
     shuffle: true
     drop_last: false
+    
   checkpoint_dir: null  # Start fresh
+  
+  # NEW: Early stopping configuration
+  early_stopping:
+    enabled: true
+    patience: 20
+    min_delta: 0.0001
+    metric: mean_error  # Monitor mean error for early stopping
+    
+  # NEW: Learning rate scheduler
+  lr_scheduler:
+    enabled: true
+    type: ReduceLROnPlateau
+    factor: 0.5
+    patience: 10
+    min_lr: 0.00001
 
 # Validation configuration
 val:
@@ -198,8 +227,22 @@ val:
 eval:
   test_path: /data/ahmed_data/organized/test/fine/
   coarse_test_path: /data/ahmed_data/organized/test/coarse/
-  save_path: /data/ahmed_data/predictions_fixed/
-  checkpoint_name: DoMINOEnhanced.0.499.pt  # final checkpoint
-  scaling_param_path: outputs/Ahmed_Dataset/enhanced_fixed
+  save_path: /data/ahmed_data/predictions_v2/
+  checkpoint_name: best_model.pt  # Will be created during training
+  scaling_param_path: outputs/Ahmed_Dataset/enhanced_v2_physics
   refine_stl: false
   stencil_size: 7
+
+# NEW: Physics loss configuration
+physics_loss:
+  mse_weight: 0.4          # Weight for MSE loss
+  distribution_weight: 0.3 # Weight for distribution matching
+  physics_weight: 0.2      # Weight for physics-based loss
+  regularization_weight: 0.1 # Weight for regularization
+  
+  # Monitoring thresholds
+  max_mean_error: 0.5      # Maximum acceptable mean error
+  min_improvement: 0.01    # Minimum improvement over baseline
+  
+  # Gradient clipping
+  gradient_clip_norm: 1.0  # Clip gradients to prevent explosions

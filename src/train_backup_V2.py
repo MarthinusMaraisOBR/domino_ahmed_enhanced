@@ -70,8 +70,6 @@ from enhanced_domino_model import DoMINOEnhanced
 
 from physicsnemo.utils.profiling import profile, Profiler
 
-from physics_loss import PhysicsAwareLoss
-
 # Initialize NVML
 nvmlInit()
 
@@ -740,181 +738,6 @@ def train_epoch_enhanced(
 
     return last_loss
 
-@profile
-def train_epoch_enhanced_physics(
-    dataloader,
-    model,
-    optimizer,
-    scaler,
-    tb_writer,
-    logger,
-    gpu_handle,
-    epoch_index,
-    device,
-    integral_scaling_factor,
-    loss_fn_type,
-    vol_loss_scaling=None,
-    surf_loss_scaling=None,
-    use_physics_loss=False,
-):
-    """Enhanced training with physics-aware loss and monitoring."""
-    
-    dist = DistributedManager()
-    running_loss = 0.0
-    running_improvement = 0.0
-    running_mean_error = 0.0
-    loss_interval = 1
-    
-    # Initialize physics-aware loss if enabled
-    if use_physics_loss:
-        physics_loss_fn = PhysicsAwareLoss()
-    
-    gpu_start_info = nvmlDeviceGetMemoryInfo(gpu_handle)
-    start_time = time.perf_counter()
-    
-    for i_batch, sample_batched in enumerate(dataloader):
-        sampled_batched = dict_to_device(sample_batched, device)
-
-        with autocast(enabled=True):
-            with nvtx.range("Model Forward Pass"):
-                prediction_vol, prediction_surf = model(sampled_batched)
-
-            # Extract fine and coarse features
-            surface_fields_all = sampled_batched["surface_fields"]
-            target_surf = surface_fields_all[..., :4]  # Fine features
-            coarse_surf = surface_fields_all[..., 4:8]  # Coarse features
-            
-            if use_physics_loss:
-                # Use physics-aware loss
-                surface_areas = sampled_batched["surface_areas"]
-                surface_areas = torch.unsqueeze(surface_areas, -1)
-                surface_normals = sampled_batched["surface_normals"]
-                
-                total_loss, loss_components = physics_loss_fn(
-                    prediction_surf,
-                    target_surf,
-                    coarse_surf,
-                    surface_areas,
-                    surface_normals,
-                    model
-                )
-                
-                # Add model regularization
-                if hasattr(model, 'get_regularization_loss'):
-                    model_reg = model.get_regularization_loss()
-                    total_loss = total_loss + 0.01 * model_reg
-                
-                # Track mean error
-                pred_mean = prediction_surf.mean()
-                target_mean = target_surf.mean()
-                mean_error = abs(pred_mean - target_mean)
-                running_mean_error += mean_error.item()
-                
-                # Track improvement
-                baseline_error = torch.mean((coarse_surf - target_surf) ** 2)
-                prediction_error = torch.mean((prediction_surf - target_surf) ** 2)
-                improvement = (baseline_error - prediction_error) / baseline_error
-                running_improvement += improvement.item()
-                
-                loss_dict = {
-                    "total_loss": total_loss,
-                    "mse": torch.tensor(loss_components['mse']),
-                    "distribution": torch.tensor(loss_components['distribution']),
-                    "physics": torch.tensor(loss_components['physics']),
-                    "regularization": torch.tensor(loss_components['regularization']),
-                    "mean_error": mean_error,
-                    "improvement": improvement
-                }
-            else:
-                # Use standard enhanced loss
-                loss, loss_dict = compute_loss_dict_enhanced(
-                    prediction_vol,
-                    prediction_surf,
-                    sampled_batched,
-                    loss_fn_type,
-                    integral_scaling_factor,
-                    surf_loss_scaling,
-                    vol_loss_scaling,
-                    use_enhanced_features=True,
-                )
-                total_loss = loss
-                
-                if "improvement" in loss_dict:
-                    running_improvement += loss_dict["improvement"].item()
-
-        loss = total_loss / loss_interval
-        scaler.scale(loss).backward()
-
-        if ((i_batch + 1) % loss_interval == 0) or (i_batch + 1 == len(dataloader)):
-            scaler.step(optimizer)
-            scaler.update()
-            optimizer.zero_grad()
-
-        # Monitor weights if using enhanced model
-        if hasattr(model, 'module'):  # DDP wrapper
-            actual_model = model.module
-        else:
-            actual_model = model
-            
-        if hasattr(actual_model, 'coarse_to_fine_model'):
-            c2f = actual_model.coarse_to_fine_model
-            if hasattr(c2f, 'actual_residual_weight'):
-                residual_w = c2f.actual_residual_weight.item()
-                correction_w = c2f.actual_correction_weight.item()
-                
-                # Warning if weights are problematic
-                if residual_w < 0.7:
-                    logger.warning(f"Residual weight too low: {residual_w:.3f}")
-                if correction_w > 0.3:
-                    logger.warning(f"Correction weight too high: {correction_w:.3f}")
-
-        # Logging
-        running_loss += loss.item()
-        
-        if i_batch % 10 == 0:  # Log every 10 batches
-            elapsed_time = time.perf_counter() - start_time
-            start_time = time.perf_counter()
-            gpu_end_info = nvmlDeviceGetMemoryInfo(gpu_handle)
-            gpu_memory_used = gpu_end_info.used / (1024**3)
-            
-            logging_string = f"Device {device}, Epoch {epoch_index}, Batch {i_batch + 1}/{len(dataloader)}\n"
-            
-            # Format loss components
-            loss_string = "  Losses: "
-            for key, value in loss_dict.items():
-                if key not in ["improvement", "mean_error"]:
-                    loss_string += f"{key}: {value.item():.3e}, "
-            loss_string += "\n"
-            
-            if "mean_error" in loss_dict:
-                loss_string += f"  Mean error: {loss_dict['mean_error'].item():.4f}\n"
-            if "improvement" in loss_dict:
-                loss_string += f"  Improvement: {loss_dict['improvement'].item():.1%}\n"
-            
-            if hasattr(c2f, 'actual_residual_weight'):
-                loss_string += f"  Weights: residual={residual_w:.3f}, correction={correction_w:.3f}\n"
-            
-            logging_string += loss_string
-            logging_string += f"  GPU memory: {gpu_memory_used:.3f} GB, Time: {elapsed_time:.2f}s\n"
-            
-            logger.info(logging_string)
-            gpu_start_info = gpu_end_info
-
-    last_loss = running_loss / (i_batch + 1)
-    
-    if dist.rank == 0:
-        tb_x = epoch_index * len(dataloader) + i_batch + 1
-        tb_writer.add_scalar("Loss/train", last_loss, tb_x)
-        
-        if running_improvement > 0:
-            avg_improvement = running_improvement / (i_batch + 1)
-            tb_writer.add_scalar("Improvement/train", avg_improvement, tb_x)
-        
-        if running_mean_error > 0:
-            avg_mean_error = running_mean_error / (i_batch + 1)
-            tb_writer.add_scalar("MeanError/train", avg_mean_error, tb_x)
-
-    return last_loss
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -942,20 +765,14 @@ def main(cfg: DictConfig) -> None:
 
     # Check if enhanced features are enabled
     use_enhanced_features = cfg.data_processor.get('use_enhanced_features', False)
-    use_physics_loss = cfg.model.get('use_physics_loss', False)
     
     if use_enhanced_features:
         logger.info("="*60)
-        logger.info("ENHANCED TRAINING MODE - Coarse-to-Fine Prediction")
+        logger.info("🚀 ENHANCED TRAINING MODE - Coarse-to-Fine Prediction")
         logger.info("="*60)
         logger.info("  Training to predict fine resolution from coarse input")
         logger.info(f"  Fine data path: {cfg.data_processor.input_dir}")
         logger.info(f"  Coarse data path: {cfg.data_processor.coarse_input_dir}")
-        if use_physics_loss:
-            logger.info("  Physics-aware loss: ENABLED")
-            logger.info("    - Distribution matching to prevent mean shift")
-            logger.info("    - Weight regularization for stable training")
-            logger.info("    - Real-time monitoring of prediction statistics")
 
     # Handle volume variables (check if they exist for surface-only datasets)
     num_vol_vars = 0
@@ -1074,20 +891,13 @@ def main(cfg: DictConfig) -> None:
             output_features_surf=num_surf_vars,
             model_parameters=cfg.model,
         ).to(dist.device)
-        logger.info("  Enhanced model created successfully")
+        logger.info("  ✅ Enhanced model created successfully")
         
         # Log enhanced configuration
         enhanced_config = cfg.model.get('enhanced_model', {})
         logger.info(f"  Surface input features: {enhanced_config.get('surface_input_features', 4)}")
-        logger.info(f"  Use spectral: {enhanced_config.get('coarse_to_fine', {}).get('use_spectral', False)}")
+        logger.info(f"  Use spectral: {enhanced_config.get('coarse_to_fine', {}).get('use_spectral', True)}")
         logger.info(f"  Use residual: {enhanced_config.get('coarse_to_fine', {}).get('use_residual', True)}")
-        
-        # Log weight constraints if using physics loss
-        if use_physics_loss:
-            c2f_config = enhanced_config.get('coarse_to_fine', {})
-            logger.info(f"  Weight constraints:")
-            logger.info(f"    Residual weight range: [{c2f_config.get('residual_weight_min', 0.7)}, {c2f_config.get('residual_weight_max', 1.0)}]")
-            logger.info(f"    Max correction weight: {c2f_config.get('correction_weight_max', 0.3)}")
     else:
         logger.info("\nCreating standard DoMINO model...")
         model = DoMINO(
@@ -1096,7 +906,7 @@ def main(cfg: DictConfig) -> None:
             output_features_surf=num_surf_vars,
             model_parameters=cfg.model,
         ).to(dist.device)
-        logger.info("  Standard model created successfully")
+        logger.info("  ✅ Standard model created successfully")
     
     model = torch.compile(model, disable=True)
 
@@ -1114,14 +924,8 @@ def main(cfg: DictConfig) -> None:
             static_graph=True,
         )
 
-    # Optimizer and scheduler - adjust learning rate for physics-aware training
-    if use_physics_loss:
-        initial_lr = cfg.train.get('learning_rate', 0.0001)  # Lower LR for physics loss
-        logger.info(f"Using learning rate: {initial_lr} (reduced for physics-aware training)")
-    else:
-        initial_lr = 0.001
-        
-    optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr)
+    # Optimizer and scheduler
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optimizer, milestones=[100, 200, 300, 400, 500, 600, 700, 800], gamma=0.5
     )
@@ -1166,11 +970,6 @@ def main(cfg: DictConfig) -> None:
             numbers.append(number)
 
     best_vloss = min(numbers) if numbers else 1_000_000.0
-    
-    # Initialize tracking variables for early stopping
-    high_mean_error_epochs = 0
-    low_improvement_epochs = 0
-    best_improvement = -1.0
 
     initial_integral_factor_orig = cfg.model.integral_loss_scaling_factor
 
@@ -1198,57 +997,25 @@ def main(cfg: DictConfig) -> None:
         model.train(True)
         epoch_start_time = time.perf_counter()
         
-        # Choose training function based on configuration
+        # Use enhanced training functions if enhanced features are enabled
         if use_enhanced_features:
-            if use_physics_loss:
-                logger.info("Running enhanced training with physics-aware loss...")
-                avg_loss = train_epoch_enhanced_physics(
-                    dataloader=train_dataloader,
-                    model=model,
-                    optimizer=optimizer,
-                    scaler=scaler,
-                    tb_writer=writer,
-                    logger=logger,
-                    gpu_handle=gpu_handle,
-                    epoch_index=epoch,
-                    device=dist.device,
-                    integral_scaling_factor=initial_integral_factor,
-                    loss_fn_type=cfg.model.loss_function,
-                    vol_loss_scaling=cfg.model.vol_loss_scaling,
-                    surf_loss_scaling=surface_scaling_loss,
-                    use_physics_loss=True,
-                )
-                
-                # Extract metrics from training if available
-                # This assumes train_epoch_enhanced_physics returns a tuple (loss, metrics)
-                # If not, modify the function to return metrics
-                if isinstance(avg_loss, tuple):
-                    avg_loss, train_metrics = avg_loss
-                    avg_mean_error = train_metrics.get('mean_error', 0)
-                    avg_improvement = train_metrics.get('improvement', 0)
-                else:
-                    avg_mean_error = 0
-                    avg_improvement = 0
-            else:
-                logger.info("Running enhanced training epoch...")
-                avg_loss = train_epoch_enhanced(
-                    dataloader=train_dataloader,
-                    model=model,
-                    optimizer=optimizer,
-                    scaler=scaler,
-                    tb_writer=writer,
-                    logger=logger,
-                    gpu_handle=gpu_handle,
-                    epoch_index=epoch,
-                    device=dist.device,
-                    integral_scaling_factor=initial_integral_factor,
-                    loss_fn_type=cfg.model.loss_function,
-                    vol_loss_scaling=cfg.model.vol_loss_scaling,
-                    surf_loss_scaling=surface_scaling_loss,
-                    use_enhanced_features=use_enhanced_features,
-                )
-                avg_mean_error = 0
-                avg_improvement = 0
+            logger.info("Running enhanced training epoch...")
+            avg_loss = train_epoch_enhanced(
+                dataloader=train_dataloader,
+                model=model,
+                optimizer=optimizer,
+                scaler=scaler,
+                tb_writer=writer,
+                logger=logger,
+                gpu_handle=gpu_handle,
+                epoch_index=epoch,
+                device=dist.device,
+                integral_scaling_factor=initial_integral_factor,
+                loss_fn_type=cfg.model.loss_function,
+                vol_loss_scaling=cfg.model.vol_loss_scaling,
+                surf_loss_scaling=surface_scaling_loss,
+                use_enhanced_features=use_enhanced_features,
+            )
         else:
             logger.info("Running standard training epoch...")
             avg_loss = train_epoch(
@@ -1266,8 +1033,6 @@ def main(cfg: DictConfig) -> None:
                 vol_loss_scaling=cfg.model.vol_loss_scaling,
                 surf_loss_scaling=surface_scaling_loss,
             )
-            avg_mean_error = 0
-            avg_improvement = 0
 
         epoch_end_time = time.perf_counter()
         logger.info(
@@ -1279,53 +1044,7 @@ def main(cfg: DictConfig) -> None:
         
         # Skip validation temporarily due to scaling factor mismatch
         avg_vloss = avg_loss * 0.95  # Use 95% of training loss as estimate
-        logger.info("Skipping full validation - using training loss estimate")
-
-        # Early stopping checks for physics-aware training
-        if use_enhanced_features and use_physics_loss:
-            # Check mean error
-            if avg_mean_error > 0.5:
-                high_mean_error_epochs += 1
-                logger.warning(f"High mean error ({avg_mean_error:.4f}) for {high_mean_error_epochs} epochs")
-                
-                if high_mean_error_epochs > 10:
-                    logger.error("Mean error persistently high for 10 epochs")
-                    logger.error("Model likely learned wrong transformation - stopping training")
-                    break
-            else:
-                high_mean_error_epochs = 0
-            
-            # Check improvement over baseline
-            if avg_improvement < 0.01 and epoch > 20:  # After warmup
-                low_improvement_epochs += 1
-                logger.warning(f"Low improvement ({avg_improvement:.1%}) for {low_improvement_epochs} epochs")
-                
-                if low_improvement_epochs > 15:
-                    logger.error("Model not improving over baseline for 15 epochs")
-                    logger.error("Training appears stuck - consider adjusting hyperparameters")
-                    break
-            else:
-                low_improvement_epochs = 0
-            
-            # Track best improvement
-            if avg_improvement > best_improvement:
-                best_improvement = avg_improvement
-                logger.info(f"  New best improvement: {best_improvement:.1%}")
-            
-            # Check model weights for anomalies
-            if hasattr(model, 'module'):
-                actual_model = model.module
-            else:
-                actual_model = model
-                
-            if hasattr(actual_model, 'coarse_to_fine_model'):
-                c2f = actual_model.coarse_to_fine_model
-                if hasattr(c2f, 'actual_residual_weight'):
-                    residual_w = c2f.actual_residual_weight.item()
-                    if residual_w < 0.5:
-                        logger.error(f"Residual weight collapsed to {residual_w:.3f}")
-                        logger.error("Model weights indicate training failure - stopping")
-                        break
+        logger.info("Skipping validation - using training loss estimate")
 
         scheduler.step()
         
@@ -1336,12 +1055,6 @@ def main(cfg: DictConfig) -> None:
         logger.info(f"  Validation loss: {avg_vloss:.5f}")
         logger.info(f"  Learning rate: {scheduler.get_last_lr()[0]:.2e}")
         logger.info(f"  Integral factor: {initial_integral_factor}")
-        
-        if use_enhanced_features and use_physics_loss:
-            logger.info(f"  Mean error: {avg_mean_error:.4f}")
-            logger.info(f"  Improvement: {avg_improvement:.1%}")
-            logger.info(f"  Best improvement: {best_improvement:.1%}")
-        
         logger.info(f"  Total epoch time: {time.perf_counter() - start_time:.3f} seconds")
 
         if dist.rank == 0:
@@ -1350,11 +1063,6 @@ def main(cfg: DictConfig) -> None:
                 {"Training": avg_loss, "Validation": avg_vloss},
                 epoch_number,
             )
-            
-            if use_enhanced_features and use_physics_loss:
-                writer.add_scalar("MeanError/train", avg_mean_error, epoch_number)
-                writer.add_scalar("Improvement/train", avg_improvement, epoch_number)
-            
             writer.flush()
 
         # Track best performance, and save the model's state
@@ -1363,7 +1071,7 @@ def main(cfg: DictConfig) -> None:
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            logger.info(f"  NEW BEST VALIDATION LOSS: {best_vloss:.5f}")
+            logger.info(f"  🏆 NEW BEST VALIDATION LOSS: {best_vloss:.5f}")
             if dist.rank == 0:
                 save_checkpoint(
                     to_absolute_path(best_model_path),
@@ -1377,7 +1085,7 @@ def main(cfg: DictConfig) -> None:
             logger.info(f"  Best validation loss so far: {best_vloss:.5f}")
 
         if dist.rank == 0 and (epoch + 1) % cfg.train.checkpoint_interval == 0.0:
-            logger.info(f"  Saving checkpoint at epoch {epoch}")
+            logger.info(f"  💾 Saving checkpoint at epoch {epoch}")
             save_checkpoint(
                 to_absolute_path(model_save_path),
                 models=model,
@@ -1393,21 +1101,16 @@ def main(cfg: DictConfig) -> None:
             logger.info("\n" + "="*60)
             logger.info("Training ended - Learning rate reached minimum")
             logger.info("="*60)
-            break
+            exit()
 
     logger.info("\n" + "="*60)
-    logger.info("TRAINING COMPLETED")
+    logger.info("TRAINING COMPLETED SUCCESSFULLY!")
     logger.info("="*60)
     logger.info(f"Final best validation loss: {best_vloss:.5f}")
-    
-    if use_enhanced_features and use_physics_loss:
-        logger.info(f"Best improvement achieved: {best_improvement:.1%}")
-    
     logger.info(f"Checkpoints saved in: {model_save_path}")
     logger.info("\nNext steps:")
     logger.info("1. Test the model with: python test_enhanced.py")
     logger.info("2. View training curves in TensorBoard")
-    logger.info("3. Check model weights for proper convergence")
 
 
 if __name__ == "__main__":
