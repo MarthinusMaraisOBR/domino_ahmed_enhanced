@@ -807,6 +807,20 @@ def main(cfg: DictConfig):
                     'processing_time': elapsed_time
                 })
                 
+                # ADDED: Save the comprehensive VTP file with all results
+                print(f"Saving comprehensive VTP to: {vtp_comprehensive_save_path}")
+                save_comprehensive_vtp(
+                    output_path=vtp_comprehensive_save_path,
+                    base_mesh=reference_mesh,
+                    coarse_fields=coarse_data['fields'],
+                    fine_fields_interpolated=fine_data['fields'],
+                    predicted_fields=prediction_surf[0] if len(prediction_surf.shape) > 2 else prediction_surf,
+                    surface_variable_names=surface_variable_names,
+                    coarse_info=coarse_data['field_info'],
+                    fine_info=fine_data['field_info']
+                )
+                print(f"✅ VTP saved successfully")
+                
         except Exception as e:
             print(f"  ❌ Error processing {dirname}: {str(e)}")
             import traceback

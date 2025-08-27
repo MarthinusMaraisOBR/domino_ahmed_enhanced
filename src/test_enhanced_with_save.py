@@ -791,6 +791,18 @@ def main(cfg: DictConfig):
                 print(f"    Baseline error: {coarse_to_fine_lift_error:.6f}")
                 print(f"    Prediction error: {pred_to_fine_lift_error:.6f}")
                 print(f"    Improvement: {lift_improvement:.1f}%")
+            # ADDED: Actually save the VTP file
+            print(f"Saving comprehensive VTP to: {vtp_comprehensive_save_path}")
+            save_comprehensive_vtp(
+                output_path=vtp_comprehensive_save_path,
+                base_mesh=reference_mesh,
+                coarse_fields=coarse_data['fields'],
+                fine_fields_interpolated=fine_data['fields'],
+                predicted_fields=prediction_surf[0],
+                surface_variable_names=surface_variable_names,
+                coarse_info=coarse_data['field_info'],
+                fine_info=fine_data['field_info']
+            )
 
                 # Store results with coefficient naming
                 results_summary.append({
