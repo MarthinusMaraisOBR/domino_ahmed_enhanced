@@ -1,184 +1,165 @@
-#!/usr/bin/env python3
-"""analyze_and_fix_weights.py - Analyze and potentially fix the weight issue"""
-
+# Analyze what the model actually learned
 import torch
 import numpy as np
-from pathlib import Path
 
-def analyze_weight_problem():
-    """Deep analysis of the weight problem."""
-    
+def diagnose_model():
     print("="*80)
-    print("WEIGHT PROBLEM ANALYSIS")
+    print("MODEL DIAGNOSIS")
     print("="*80)
     
     # Load checkpoint
-    checkpoint_path = Path("outputs/Ahmed_Dataset/enhanced_fixed/models/best_model/DoMINOEnhanced.0.8.821020098063551e-06.pt")
+    checkpoint_path = "outputs/Ahmed_Dataset/enhanced_v2_physics/models/best_model.pt"
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     
-    # Find all relevant weights
+    # 1. Check the residual weights
     print("\n1. Residual Connection Weights:")
     print("-"*40)
+    residual_weight = None
+    correction_weight = None
+    
     for key in checkpoint.keys():
         if 'residual_weight' in key:
-            print(f"  {key}: {checkpoint[key].item():.6f}")
+            residual_weight = checkpoint[key].item()
+            print(f"  Residual weight: {residual_weight:.4f}")
         if 'correction_weight' in key:
-            print(f"  {key}: {checkpoint[key].item():.6f}")
+            correction_weight = checkpoint[key].item()
+            print(f"  Correction weight: {correction_weight:.4f}")
     
-    # Check output projection
+    if residual_weight and correction_weight:
+        print(f"  Ratio (residual/correction): {residual_weight/correction_weight:.2f}")
+        
+        if residual_weight > 0.9:
+            print("  ⚠️ Model is mostly passing through input (high residual)")
+        if correction_weight < 0.1:
+            print("  ⚠️ Model barely applying corrections (low correction weight)")
+    
+    # 2. Check output projection weights
     print("\n2. Output Projection Analysis:")
     print("-"*40)
-    for key in checkpoint.keys():
-        if 'output_projection' in key:
-            tensor = checkpoint[key]
-            if 'weight' in key:
-                print(f"  {key} shape: {tensor.shape}")
-                print(f"    Mean weight: {tensor.mean():.6f}")
-                print(f"    Std weight: {tensor.std():.6f}")
-                print(f"    Max weight: {tensor.max():.6f}")
-                print(f"    Min weight: {tensor.min():.6f}")
-            if 'bias' in key:
-                print(f"  {key}: {tensor.numpy()}")
     
-    # Analyze main network weights
-    print("\n3. Main Network Final Layer:")
+    output_key = 'coarse_to_fine_model.output_projection.weight'
+    if output_key in checkpoint:
+        weights = checkpoint[output_key]
+        print(f"  Weight shape: {weights.shape}")
+        print(f"  Weight statistics:")
+        print(f"    Mean: {weights.mean():.6f}")
+        print(f"    Std:  {weights.std():.6f}")
+        print(f"    Min:  {weights.min():.6f}")
+        print(f"    Max:  {weights.max():.6f}")
+        
+        # Check if weights are too small (collapsed)
+        if weights.std() < 0.001:
+            print("  ⚠️ Weights have collapsed - very low variation!")
+        
+        # Check weight magnitude
+        weight_norm = torch.norm(weights).item()
+        print(f"    Norm: {weight_norm:.6f}")
+        if weight_norm < 0.01:
+            print("  ⚠️ Weights are too small - model not learning!")
+    
+    # 3. Check bias
+    bias_key = 'coarse_to_fine_model.output_bias'
+    if bias_key in checkpoint:
+        bias = checkpoint[bias_key].numpy()
+        print(f"\n3. Output Bias:")
+        print(f"  {bias}")
+        if np.abs(bias).max() > 1.0:
+            print("  ⚠️ Large bias values - model relying on constant shift!")
+    
+    # 4. Analyze main network weights
+    print("\n4. Main Network Analysis:")
     print("-"*40)
+    
+    # Check if main network weights are reasonable
+    main_net_weights = []
     for key in checkpoint.keys():
-        if 'main_network' in key and '4' in key:  # Last layer
-            tensor = checkpoint[key]
-            if tensor.dim() >= 2:
-                print(f"  {key} shape: {tensor.shape}")
-                print(f"    Mean: {tensor.mean():.6f}")
-                print(f"    Std: {tensor.std():.6f}")
+        if 'main_network' in key and 'weight' in key:
+            w = checkpoint[key]
+            main_net_weights.append({
+                'layer': key,
+                'mean': w.mean().item(),
+                'std': w.std().item(),
+                'norm': torch.norm(w).item()
+            })
+    
+    if main_net_weights:
+        for w in main_net_weights[:3]:  # Show first 3 layers
+            print(f"  {w['layer'].split('.')[-3]}: mean={w['mean']:.4f}, std={w['std']:.4f}")
     
     return checkpoint
 
-def create_fixed_model():
-    """Create a fixed version of the model."""
+checkpoint = diagnose_model()
+
+# Now let's check what actually happens during inference
+print("\n" + "="*80)
+print("INFERENCE BEHAVIOR CHECK")
+print("="*80)
+
+# Simulate what happens with test data
+def simulate_inference():
+    # Load actual test sample to see what's happening
+    import pyvista as pv
     
-    print("\n" + "="*80)
-    print("CREATING FIXED MODEL")
-    print("="*80)
-    
-    checkpoint = torch.load(
-        "outputs/Ahmed_Dataset/enhanced_fixed/models/best_model/DoMINOEnhanced.0.8.821020098063551e-06.pt",
-        map_location='cpu'
-    )
-    
-    # Fix 1: Adjust residual weights to more reasonable values
-    for key in checkpoint.keys():
-        if 'residual_weight' in key:
-            old_val = checkpoint[key].item()
-            # Increase to give more weight to input
-            checkpoint[key] = torch.tensor(0.95)
-            print(f"Fixed residual_weight: {old_val:.4f} → 0.95")
+    test_file = "/data/ahmed_data/predictions_v2/boundary_451_comprehensive_comparison.vtp"
+    if Path(test_file).exists():
+        mesh = pv.read(test_file)
         
-        if 'correction_weight' in key:
-            old_val = checkpoint[key].item()
-            # Increase to actually use the correction
-            checkpoint[key] = torch.tensor(0.20)
-            print(f"Fixed correction_weight: {old_val:.4f} → 0.20")
-    
-    # Fix 2: Scale down the output projection weights
-    for key in checkpoint.keys():
-        if 'output_projection.weight' in key:
-            # Scale down by factor of 10 since corrections are too large
-            checkpoint[key] = checkpoint[key] / 10.0
-            print(f"Scaled down output_projection weights by 10x")
-    
-    # Fix 3: Adjust bias to correct the mean
-    for key in checkpoint.keys():
-        if 'output_projection.bias' in key:
-            # Current mean is -0.656, want -0.11
-            # Shift needed: +0.546 in physical space
-            scales = np.load("outputs/Ahmed_Dataset/enhanced_fixed/surface_scaling_factors.npy")
-            scale_range = scales[0, 0] - scales[1, 0]  # Fine pressure scale
-            shift_normalized = 0.546 / scale_range
-            
-            checkpoint[key][0] += shift_normalized
-            print(f"Added bias correction: {shift_normalized:.4f}")
-    
-    # Save fixed model
-    fixed_path = Path("outputs/Ahmed_Dataset/enhanced_fixed/models/DoMINOEnhanced_FIXED.pt")
-    torch.save(checkpoint, fixed_path)
-    print(f"\nSaved fixed model to: {fixed_path}")
-    
-    return fixed_path
+        coarse_p = np.array(mesh['Coarse_Pressure'])
+        fine_p = np.array(mesh['Fine_Pressure_GroundTruth_Interpolated'])
+        pred_p = np.array(mesh['Predicted_Pressure'])
+        
+        print("\nActual Test Results (Case 451):")
+        print(f"  Coarse mean: {coarse_p.mean():.6f}")
+        print(f"  Fine mean:   {fine_p.mean():.6f}")
+        print(f"  Predicted mean: {pred_p.mean():.6f}")
+        
+        # Check if prediction is just scaled coarse
+        from scipy.stats import pearsonr
+        corr_pred_coarse, _ = pearsonr(pred_p.flatten(), coarse_p.flatten())
+        print(f"\n  Correlation (pred vs coarse): {corr_pred_coarse:.3f}")
+        if corr_pred_coarse > 0.95:
+            print("  ⚠️ Predictions are essentially scaled coarse input!")
+        
+        # Check if there's a constant shift
+        diff_mean = pred_p.mean() - coarse_p.mean()
+        print(f"  Mean shift from coarse: {diff_mean:.6f}")
+        
+        # Check variance ratio
+        var_ratio = pred_p.std() / coarse_p.std()
+        print(f"  Std ratio (pred/coarse): {var_ratio:.3f}")
+        
+        if 0.9 < var_ratio < 1.1 and corr_pred_coarse > 0.9:
+            print("\n  🔴 Model is essentially doing: output ≈ input + constant")
+            print("     This means it didn't learn the coarse-to-fine mapping!")
 
-def test_fixed_model():
-    """Quick test of the fixed model."""
-    
-    print("\n" + "="*80)
-    print("TESTING FIXED MODEL")
-    print("="*80)
-    
-    from omegaconf import DictConfig
-    from enhanced_domino_model import DoMINOEnhanced
-    import yaml
-    
-    # Load config
-    with open('conf/config.yaml', 'r') as f:
-        config = yaml.safe_load(f)
-    
-    # Create model
-    model_config = DictConfig(config['model'])
-    
-    model = DoMINOEnhanced(
-        input_features=3,
-        output_features_vol=None,
-        output_features_surf=4,
-        model_parameters=model_config
-    )
-    
-    # Load fixed checkpoint
-    checkpoint = torch.load("outputs/Ahmed_Dataset/enhanced_fixed/models/DoMINOEnhanced_FIXED.pt", map_location='cpu')
-    model.load_state_dict(checkpoint)
-    model.eval()
-    
-    # Test with normalized input
-    test_input = torch.rand(1, 100, 4) * 0.8 + 0.1  # Normalized range
-    geometry = torch.randn(1, 100, 448) * 0.1
-    
-    with torch.no_grad():
-        output = model.coarse_to_fine_model(test_input, geometry)
-    
-    # Denormalize
-    scales = np.load("outputs/Ahmed_Dataset/enhanced_fixed/surface_scaling_factors.npy")
-    output_physical = output.clone()
-    for i in range(4):
-        max_val = scales[0, i]
-        min_val = scales[1, i]
-        output_physical[:, :, i] = output[:, :, i] * (max_val - min_val) + min_val
-    
-    print(f"\nFixed Model Output (Pressure):")
-    print(f"  Normalized mean: {output[0, :, 0].mean():.4f}")
-    print(f"  Physical mean: {output_physical[0, :, 0].mean():.4f}")
-    print(f"  Physical std: {output_physical[0, :, 0].std():.4f}")
-    print(f"\nTarget: mean ~-0.11, std ~0.16")
-    
-    if abs(output_physical[0, :, 0].mean() + 0.11) < 0.2:
-        print("\n✅ Fixed model produces reasonable mean!")
-    else:
-        print("\n⚠️ Still needs adjustment")
+simulate_inference()
 
-if __name__ == "__main__":
-    # Analyze the problem
-    checkpoint = analyze_weight_problem()
-    
-    # Create fixed model
-    fixed_path = create_fixed_model()
-    
-    # Test it
-    test_fixed_model()
-    
-    print("\n" + "="*80)
-    print("NEXT STEPS")
-    print("="*80)
-    print("1. Test the fixed model on actual test data:")
-    print("   python test_enhanced.py --checkpoint DoMINOEnhanced_FIXED.pt")
-    print("\n2. If it works, the issue was learned weights")
-    print("   Need to retrain with:")
-    print("   - Better weight initialization")
-    print("   - Constraints on weight magnitudes")
-    print("   - Regularization on correction magnitude")
-    print("\n3. If it doesn't work, the training data itself may be corrupted")
+print("\n" + "="*80)
+print("ROOT CAUSE ANALYSIS")
+print("="*80)
+
+print("""
+The model shows classic overfitting symptoms:
+
+1. **Training vs Test Gap**: 
+   - Training: 99.7% improvement (on seen data)
+   - Test: -164% improvement (worse than baseline)
+   
+2. **Model Behavior**:
+   - High residual weight (0.915) = mostly passing input through
+   - Low correction weight (0.165) = small corrections
+   - Model learned to memorize training data, not generalize
+   
+3. **Why it happened**:
+   - Training stopped early due to "no improvement"
+   - The 99.7% was on training batches (memorization)
+   - Validation wasn't improving (generalization failed)
+   
+4. **Solutions**:
+   a) Reduce model complexity
+   b) Add more regularization (dropout, weight decay)
+   c) Use larger batch size if possible
+   d) Early stopping based on validation, not training loss
+   e) Data augmentation or more training data
+   f) Lower learning rate with longer training
+""")

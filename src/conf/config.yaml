@@ -20,7 +20,7 @@ hydra:
   output_subdir: hydra
 
 # Resume directory for checkpoints
-resume_dir: ${output}/models
+# resume_dir: ${output}/models
 
 # Data preprocessing configuration
 data_processor:
@@ -228,10 +228,13 @@ eval:
   test_path: /data/ahmed_data/organized/test/fine/
   coarse_test_path: /data/ahmed_data/organized/test/coarse/
   save_path: /data/ahmed_data/predictions_v2/
-  checkpoint_name: best_model.pt  # Will be created during training
-  scaling_param_path: outputs/Ahmed_Dataset/enhanced_v2_physics
+  checkpoint_name: best_model.pt
+  scaling_param_path: outputs/Ahmed_Dataset/enhanced_v2_physics  # Already correct
   refine_stl: false
   stencil_size: 7
+
+# Add/update this section for model loading
+resume_dir: outputs/Ahmed_Dataset/enhanced_v2_physics/models/
 
 # NEW: Physics loss configuration
 physics_loss:
