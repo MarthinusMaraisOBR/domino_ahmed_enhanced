@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: Copyright (c) 2023 - 2024 NVIDIA CORPORATION & AFFILIATES.
-# SPDX-License-Identifier: Apache-2.0
-
 """
-FIXED Enhanced DoMINO model testing with mesh interpolation.
-This script handles coarse and fine meshes with different resolutions by
-interpolating fine data onto the coarse mesh for proper comparison.
-
-CRITICAL FIX:
-- Interpolates fine ground truth data onto coarse mesh coordinates
-- Ensures all field arrays have matching dimensions
-- Proper handling of different mesh resolutions
+Test Enhanced DoMINO model on TRAINING data to diagnose distribution issues.
+Testing on cases 1-5 from training set to compare with test set behavior.
 """
 
 import os
@@ -18,6 +9,7 @@ import re
 import time
 import numpy as np
 from pathlib import Path
+from datetime import datetime
 
 import hydra
 from hydra.utils import to_absolute_path
@@ -44,27 +36,30 @@ AIR_DENSITY = 1.0
 STREAM_VELOCITY = 1.0
 
 
+def write_to_vtp(polydata, filename):
+    """Write polydata to VTP file."""
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetFileName(filename)
+    writer.SetInputData(polydata)
+    writer.SetDataModeToAscii()
+    writer.Write()
+    print(f"    ✓ VTP file written: {filename}")
+
+
 def convert_point_to_cell_data_manual(mesh, field_name, n_components=1):
-    """
-    Manually convert point data to cell data using weighted averaging.
-    """
+    """Manually convert point data to cell data using weighted averaging."""
     print(f"    Manual conversion: {field_name} ({n_components} components)")
     
-    # Get point data
     point_data = np.array(mesh.point_data[field_name], dtype=np.float32)
-    
-    # Get connectivity for each cell
     n_cells = mesh.n_cells
     cell_data = np.zeros((n_cells, n_components), dtype=np.float32)
     
     for cell_id in range(n_cells):
-        # Get points for this cell
         cell = mesh.GetCell(cell_id)
         point_ids = []
         for i in range(cell.GetNumberOfPoints()):
             point_ids.append(cell.GetPointId(i))
         
-        # Average the point data for this cell
         if n_components == 1:
             cell_data[cell_id] = np.mean(point_data[point_ids])
         else:
@@ -74,34 +69,15 @@ def convert_point_to_cell_data_manual(mesh, field_name, n_components=1):
 
 
 def interpolate_fine_to_coarse(fine_coords, fine_fields, coarse_coords, k_neighbors=4):
-    """
-    Interpolate fine mesh data to coarse mesh using nearest neighbor interpolation.
-    
-    Args:
-        fine_coords: Fine mesh coordinates (N_fine, 3)
-        fine_fields: Fine mesh field values (N_fine, n_fields)
-        coarse_coords: Coarse mesh coordinates (N_coarse, 3)
-        k_neighbors: Number of nearest neighbors for interpolation
-        
-    Returns:
-        Interpolated field values on coarse mesh (N_coarse, n_fields)
-    """
+    """Interpolate fine mesh data to coarse mesh using nearest neighbor interpolation."""
     print(f"  Interpolating fine data ({fine_coords.shape[0]} cells) to coarse mesh ({coarse_coords.shape[0]} cells)")
     
-    # Build KDTree for fine mesh
     tree = cKDTree(fine_coords)
-    
-    # Find k nearest neighbors for each coarse mesh point
     distances, indices = tree.query(coarse_coords, k=k_neighbors)
-    
-    # Avoid division by zero
     distances = np.maximum(distances, 1e-10)
-    
-    # Compute inverse distance weights
     weights = 1.0 / distances
     weights = weights / weights.sum(axis=1, keepdims=True)
     
-    # Interpolate fields
     interpolated = np.zeros((coarse_coords.shape[0], fine_fields.shape[1]))
     for i in range(k_neighbors):
         interpolated += weights[:, i:i+1] * fine_fields[indices[:, i]]
@@ -111,25 +87,17 @@ def interpolate_fine_to_coarse(fine_coords, fine_fields, coarse_coords, k_neighb
 
 
 def load_coarse_vtp_data_robust(vtp_path, surface_variables):
-    """
-    Load coarse resolution VTP data with robust field extraction.
-    """
+    """Load coarse resolution VTP data with robust field extraction."""
     print(f"Loading coarse data: {vtp_path}")
     
-    # Read VTP file
     mesh = pv.read(str(vtp_path))
-    
     print(f"  Coarse mesh: {mesh.n_cells} cells, {mesh.n_points} points")
-    print(f"  Cell data keys: {list(mesh.cell_data.keys())}")
-    print(f"  Point data keys: {list(mesh.point_data.keys())}")
     
-    # Variable name mapping for coarse data
     variable_mapping = {
         'pMean': ['p', 'pressure', 'Pressure'],
         'wallShearStressMean': ['wallShearStress', 'WallShearStress', 'tau_wall']
     }
     
-    # Extract fields with proper conversion
     surface_fields = []
     field_info = []
     
@@ -137,9 +105,7 @@ def load_coarse_vtp_data_robust(vtp_path, surface_variables):
         field_found = False
         possible_names = variable_mapping.get(var_name, [var_name])
         
-        # Try each possible name
         for candidate_name in possible_names:
-            # Check cell data first (preferred)
             if candidate_name in mesh.cell_data:
                 field_data = np.array(mesh.cell_data[candidate_name], dtype=np.float32)
                 if field_data.ndim == 1:
@@ -148,23 +114,17 @@ def load_coarse_vtp_data_robust(vtp_path, surface_variables):
                 field_info.append(f"{var_name} -> {candidate_name} (cell data)")
                 field_found = True
                 break
-                
-            # Check point data (needs conversion)
             elif candidate_name in mesh.point_data:
                 print(f"  Converting {candidate_name} from point data to cell data...")
-                
-                # Determine number of components
                 point_array = mesh.point_data[candidate_name]
                 if hasattr(point_array, 'shape') and len(point_array.shape) > 1:
                     n_components = point_array.shape[1]
                 elif 'pressure' in candidate_name.lower() or 'p' == candidate_name.lower():
                     n_components = 1
                 else:
-                    n_components = 3  # Assume vector for shear stress
+                    n_components = 3
                 
-                # Convert using manual method
                 field_data = convert_point_to_cell_data_manual(mesh, candidate_name, n_components)
-                
                 if field_data.ndim == 1:
                     field_data = field_data.reshape(-1, 1)
                 
@@ -174,37 +134,29 @@ def load_coarse_vtp_data_robust(vtp_path, surface_variables):
                 break
         
         if not field_found:
-            print(f"  Warning: Variable {var_name} not found with any candidate names")
-            # Create zeros as fallback
+            print(f"  Warning: Variable {var_name} not found")
             num_cells = mesh.n_cells
-            if 'pressure' in var_name.lower() or 'p' in var_name.lower():
+            if 'pressure' in var_name.lower():
                 surface_fields.append(np.zeros((num_cells, 1), dtype=np.float32))
             else:
                 surface_fields.append(np.zeros((num_cells, 3), dtype=np.float32))
             field_info.append(f"{var_name} -> ZEROS (not found)")
     
-    # Combine all surface fields
     if surface_fields:
         surface_fields_combined = np.concatenate(surface_fields, axis=1).astype(np.float32)
     else:
         raise ValueError("No surface fields could be extracted!")
     
-    # Get mesh geometry data (ensure float32)
     surface_coordinates = np.array(mesh.cell_centers().points, dtype=np.float32)
     surface_normals = np.array(mesh.cell_normals, dtype=np.float32)
-    
-    # Compute surface areas
     surface_sizes = mesh.compute_cell_sizes(length=False, area=True, volume=False)
     surface_areas = np.array(surface_sizes.cell_data["Area"], dtype=np.float32)
-    
-    # Normalize surface normals
     norms = np.linalg.norm(surface_normals, axis=1, keepdims=True)
     surface_normals = (surface_normals / norms).astype(np.float32)
     
     print(f"  ✅ Loaded {len(surface_coordinates)} cells")
-    print(f"  Coarse surface fields shape: {surface_fields_combined.shape}")
-    for info in field_info:
-        print(f"    {info}")
+    print(f"  📊 Pressure statistics: mean={surface_fields_combined[:, 0].mean():.4f}, std={surface_fields_combined[:, 0].std():.4f}")
+    print(f"     Range: [{surface_fields_combined[:, 0].min():.4f}, {surface_fields_combined[:, 0].max():.4f}]")
     
     return {
         'coordinates': surface_coordinates,
@@ -217,33 +169,17 @@ def load_coarse_vtp_data_robust(vtp_path, surface_variables):
 
 
 def load_fine_vtp_data_and_interpolate(vtp_path, surface_variables, target_coordinates):
-    """
-    Load fine resolution VTP data and interpolate to target coordinates.
-    
-    Args:
-        vtp_path: Path to fine VTP file
-        surface_variables: List of variable names to extract
-        target_coordinates: Target coordinates for interpolation (N_target, 3)
-        
-    Returns:
-        Dictionary with interpolated fine surface data (all float32)
-    """
+    """Load fine resolution VTP data and interpolate to target coordinates."""
     print(f"Loading fine ground truth data: {vtp_path}")
     
-    # Read VTP file
     mesh = pv.read(str(vtp_path))
-    
     print(f"  Fine mesh: {mesh.n_cells} cells, {mesh.n_points} points")
-    print(f"  Cell data keys: {list(mesh.cell_data.keys())}")
-    print(f"  Point data keys: {list(mesh.point_data.keys())}")
     
-    # Variable name mapping for fine data
     variable_mapping = {
         'pMean': ['pMean', 'pressure', 'Pressure'],
         'wallShearStressMean': ['wallShearStressMean', 'wallShearStress', 'WallShearStress']
     }
     
-    # Extract fields with proper conversion
     surface_fields = []
     field_info = []
     
@@ -251,9 +187,7 @@ def load_fine_vtp_data_and_interpolate(vtp_path, surface_variables, target_coord
         field_found = False
         possible_names = variable_mapping.get(var_name, [var_name])
         
-        # Try each possible name
         for candidate_name in possible_names:
-            # Check cell data first (preferred)
             if candidate_name in mesh.cell_data:
                 field_data = np.array(mesh.cell_data[candidate_name], dtype=np.float32)
                 if field_data.ndim == 1:
@@ -262,23 +196,17 @@ def load_fine_vtp_data_and_interpolate(vtp_path, surface_variables, target_coord
                 field_info.append(f"{var_name} -> {candidate_name} (cell data)")
                 field_found = True
                 break
-                
-            # Check point data (needs conversion)
             elif candidate_name in mesh.point_data:
                 print(f"  Converting {candidate_name} from point data to cell data...")
-                
-                # Determine number of components
                 point_array = mesh.point_data[candidate_name]
                 if hasattr(point_array, 'shape') and len(point_array.shape) > 1:
                     n_components = point_array.shape[1]
-                elif 'pressure' in candidate_name.lower() or 'p' == candidate_name.lower():
+                elif 'pressure' in candidate_name.lower():
                     n_components = 1
                 else:
-                    n_components = 3  # Assume vector for shear stress
+                    n_components = 3
                 
-                # Convert using manual method
                 field_data = convert_point_to_cell_data_manual(mesh, candidate_name, n_components)
-                
                 if field_data.ndim == 1:
                     field_data = field_data.reshape(-1, 1)
                 
@@ -288,25 +216,21 @@ def load_fine_vtp_data_and_interpolate(vtp_path, surface_variables, target_coord
                 break
         
         if not field_found:
-            print(f"  Warning: Variable {var_name} not found with any candidate names")
-            # Create zeros as fallback
+            print(f"  Warning: Variable {var_name} not found")
             num_cells = mesh.n_cells
-            if 'pressure' in var_name.lower() or 'p' in var_name.lower():
+            if 'pressure' in var_name.lower():
                 surface_fields.append(np.zeros((num_cells, 1), dtype=np.float32))
             else:
                 surface_fields.append(np.zeros((num_cells, 3), dtype=np.float32))
             field_info.append(f"{var_name} -> ZEROS (not found)")
     
-    # Combine all surface fields
     if surface_fields:
         surface_fields_combined = np.concatenate(surface_fields, axis=1).astype(np.float32)
     else:
         raise ValueError("No surface fields could be extracted!")
     
-    # Get fine mesh geometry data
     fine_coordinates = np.array(mesh.cell_centers().points, dtype=np.float32)
     
-    # Interpolate fine fields to target coordinates
     interpolated_fields = interpolate_fine_to_coarse(
         fine_coords=fine_coordinates,
         fine_fields=surface_fields_combined,
@@ -315,9 +239,8 @@ def load_fine_vtp_data_and_interpolate(vtp_path, surface_variables, target_coord
     )
     
     print(f"  ✅ Interpolated fine data to target mesh")
-    print(f"  Interpolated fields shape: {interpolated_fields.shape}")
-    for info in field_info:
-        print(f"    {info}")
+    print(f"  📊 Pressure statistics: mean={interpolated_fields[:, 0].mean():.4f}, std={interpolated_fields[:, 0].std():.4f}")
+    print(f"     Range: [{interpolated_fields[:, 0].min():.4f}, {interpolated_fields[:, 0].max():.4f}]")
     
     return {
         'fields': interpolated_fields,
@@ -328,54 +251,49 @@ def load_fine_vtp_data_and_interpolate(vtp_path, surface_variables, target_coord
 
 
 def test_enhanced_model(data_dict, model, device, cfg, surf_factors):
-    """
-    Test the enhanced model with STRICT float32 type enforcement.
-    """
-    
+    """Test the enhanced model with proper normalization."""
     with torch.no_grad():
-        # CRITICAL: Ensure ALL data is float32 and on correct device
+        # Check input data statistics before GPU transfer
+        print(f"\n  🔍 Pre-model input check:")
+        print(f"     Surface fields shape: {data_dict['surface_fields'].shape}")
+        print(f"     Surface fields mean: {data_dict['surface_fields'][:, 0].mean():.4f}")
+        
         data_dict_gpu = {}
         for k, v in data_dict.items():
             if isinstance(v, np.ndarray):
-                # Convert to float32 tensor and move to device
                 v_tensor = torch.from_numpy(v.astype(np.float32)).unsqueeze(0).to(device, dtype=torch.float32)
                 data_dict_gpu[k] = v_tensor
             else:
                 data_dict_gpu[k] = v
         
-        # Verify all tensors are float32
         for k, v in data_dict_gpu.items():
             if isinstance(v, torch.Tensor):
                 if v.dtype != torch.float32:
                     print(f"WARNING: Converting {k} from {v.dtype} to float32")
                     data_dict_gpu[k] = v.to(dtype=torch.float32)
         
-        # Get predictions
         _, prediction_surf = model(data_dict_gpu)
         
         if prediction_surf is not None and surf_factors is not None:
-            # FIX: Handle enhanced scaling factors properly
-            # During training, we have 8 features (4 fine + 4 coarse interpolated)
-            # During inference, predictions are 4 features (fine only)
-            # Check if scaling factors are from enhanced training
-            if surf_factors.shape[1] == 8 and prediction_surf.shape[-1] == 4:
-                # Use only fine features scaling (first 4 columns)
-                surf_factors_inference = surf_factors[:, :4]
-                print(f"Adjusted scaling factors from shape {surf_factors.shape} to {surf_factors_inference.shape} for inference")
+            # Use the correct fine scaling for unnormalization
+            if surf_factors.shape[1] == 8:
+                fine_mean = surf_factors[0, :4]
+                fine_std = surf_factors[1, :4]
+                print(f"  Using fine scaling for unnormalization: mean={fine_mean[0]:.4f}, std={fine_std[0]:.4f}")
             else:
-                # Use scaling factors as-is
-                surf_factors_inference = surf_factors
+                fine_mean = surf_factors[0]
+                fine_std = surf_factors[1]
             
-            # Unnormalize predictions using corrected scaling factors
+            raw_output = prediction_surf.cpu().numpy()
+            print(f"  Raw model output (normalized): pressure mean={raw_output[0, :, 0].mean():.4f}, std={raw_output[0, :, 0].std():.4f}")
+            
             prediction_surf = unnormalize(
-                prediction_surf.cpu().numpy(),
-                surf_factors_inference[0],
-                surf_factors_inference[1]
+                raw_output,
+                fine_mean,
+                fine_std
             )
             
-            # REMOVED PHYSICAL SCALING - Data is already at V=1, ρ=1
-            # No need for additional scaling
-            print("✅ Skipping physical scaling (V=1, ρ=1)")
+            print(f"  After unnormalization: pressure mean={prediction_surf[0, :, 0].mean():.4f}")
     
     return prediction_surf
 
@@ -390,68 +308,61 @@ def save_comprehensive_vtp(
     coarse_info: list,
     fine_info: list
 ):
-    """
-    Save VTP file with coarse, fine (interpolated), and predicted fields.
-    """
-    print(f"Saving comprehensive VTP: {output_path}")
+    """Save VTP file with coarse, fine (interpolated), and predicted fields."""
+    print(f"\n📁 Saving VTP: {output_path}")
     
-    # Create output mesh
     polydata_out = base_mesh.copy()
     
-    # Verify all arrays have the same length
     n_cells = len(coarse_fields)
-    assert len(fine_fields_interpolated) == n_cells, f"Size mismatch: fine {len(fine_fields_interpolated)} vs coarse {n_cells}"
-    assert len(predicted_fields) == n_cells, f"Size mismatch: predicted {len(predicted_fields)} vs coarse {n_cells}"
+    assert len(fine_fields_interpolated) == n_cells
+    assert len(predicted_fields) == n_cells
     
-    print(f"  All field arrays have {n_cells} cells - dimensions match ✅")
+    print(f"  All field arrays have {n_cells} cells ✅")
     
-    # Add coarse fields (input data)
+    # Add timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp_array = vtk.vtkStringArray()
+    timestamp_array.SetName("ProcessingTimestamp")
+    timestamp_array.InsertNextValue(timestamp)
+    polydata_out.GetFieldData().AddArray(timestamp_array)
+    
+    # Add all fields as before
     coarse_pressure = coarse_fields[:, 0:1]
     coarse_wall_shear = coarse_fields[:, 1:4]
     
-    # Add coarse pressure
     coarse_pressure_vtk = numpy_support.numpy_to_vtk(coarse_pressure)
     coarse_pressure_vtk.SetName("Coarse_Pressure")
     polydata_out.GetCellData().AddArray(coarse_pressure_vtk)
     
-    # Add coarse wall shear stress
     coarse_shear_vtk = numpy_support.numpy_to_vtk(coarse_wall_shear)
     coarse_shear_vtk.SetName("Coarse_WallShearStress")
     polydata_out.GetCellData().AddArray(coarse_shear_vtk)
     
-    # Add fine fields (interpolated ground truth)
     fine_pressure = fine_fields_interpolated[:, 0:1]
     fine_wall_shear = fine_fields_interpolated[:, 1:4]
     
-    # Add fine pressure
     fine_pressure_vtk = numpy_support.numpy_to_vtk(fine_pressure)
     fine_pressure_vtk.SetName("Fine_Pressure_GroundTruth_Interpolated")
     polydata_out.GetCellData().AddArray(fine_pressure_vtk)
     
-    # Add fine wall shear stress
     fine_shear_vtk = numpy_support.numpy_to_vtk(fine_wall_shear)
     fine_shear_vtk.SetName("Fine_WallShearStress_GroundTruth_Interpolated")
     polydata_out.GetCellData().AddArray(fine_shear_vtk)
     
-    # Add predicted fields
     pred_pressure = predicted_fields[:, 0:1]
     pred_wall_shear = predicted_fields[:, 1:4]
     
-    # Add predicted pressure
     pred_pressure_vtk = numpy_support.numpy_to_vtk(pred_pressure)
     pred_pressure_vtk.SetName("Predicted_Pressure")
     polydata_out.GetCellData().AddArray(pred_pressure_vtk)
     
-    # Add predicted wall shear stress
     pred_shear_vtk = numpy_support.numpy_to_vtk(pred_wall_shear)
     pred_shear_vtk.SetName("Predicted_WallShearStress")
     polydata_out.GetCellData().AddArray(pred_shear_vtk)
     
-    # Calculate error fields (predicted vs fine ground truth)
     pressure_error = pred_pressure - fine_pressure
     shear_error = pred_wall_shear - fine_wall_shear
     
-    # Add error fields
     pressure_error_vtk = numpy_support.numpy_to_vtk(pressure_error)
     pressure_error_vtk.SetName("Error_Pressure_vs_Fine")
     polydata_out.GetCellData().AddArray(pressure_error_vtk)
@@ -460,75 +371,54 @@ def save_comprehensive_vtp(
     shear_error_vtk.SetName("Error_WallShearStress_vs_Fine")
     polydata_out.GetCellData().AddArray(shear_error_vtk)
     
-    # Calculate improvement over coarse baseline
-    coarse_pressure_error = coarse_pressure - fine_pressure
-    coarse_shear_error = coarse_wall_shear - fine_wall_shear
+    pressure_error_abs = np.abs(pressure_error)
+    shear_error_abs = np.linalg.norm(shear_error, axis=1, keepdims=True)
     
-    # Add coarse baseline error fields
-    coarse_pressure_error_vtk = numpy_support.numpy_to_vtk(coarse_pressure_error)
-    coarse_pressure_error_vtk.SetName("Error_Coarse_vs_Fine")
-    polydata_out.GetCellData().AddArray(coarse_pressure_error_vtk)
+    pressure_error_abs_vtk = numpy_support.numpy_to_vtk(pressure_error_abs)
+    pressure_error_abs_vtk.SetName("Error_Pressure_Absolute")
+    polydata_out.GetCellData().AddArray(pressure_error_abs_vtk)
     
-    coarse_shear_error_vtk = numpy_support.numpy_to_vtk(coarse_shear_error)
-    coarse_shear_error_vtk.SetName("Error_CoarseShear_vs_Fine")
-    polydata_out.GetCellData().AddArray(coarse_shear_error_vtk)
+    shear_error_abs_vtk = numpy_support.numpy_to_vtk(shear_error_abs)
+    shear_error_abs_vtk.SetName("Error_WallShearStress_Magnitude")
+    polydata_out.GetCellData().AddArray(shear_error_abs_vtk)
     
-    # Calculate relative error fields (as percentages)
-    # Avoid division by zero
-    fine_pressure_safe = np.where(np.abs(fine_pressure) < 1e-10, 1e-10, fine_pressure)
-    fine_shear_safe = np.where(np.abs(fine_wall_shear) < 1e-10, 1e-10, fine_wall_shear)
-    
-    rel_pressure_error = 100.0 * pressure_error / fine_pressure_safe
-    rel_shear_error = 100.0 * shear_error / fine_shear_safe
-    
-    rel_pressure_error_vtk = numpy_support.numpy_to_vtk(rel_pressure_error)
-    rel_pressure_error_vtk.SetName("RelativeError_Pressure_Percent")
-    polydata_out.GetCellData().AddArray(rel_pressure_error_vtk)
-    
-    rel_shear_error_vtk = numpy_support.numpy_to_vtk(rel_shear_error)
-    rel_shear_error_vtk.SetName("RelativeError_WallShearStress_Percent")
-    polydata_out.GetCellData().AddArray(rel_shear_error_vtk)
-    
-    # Write VTP file
     write_to_vtp(polydata_out, output_path)
     
-    print(f"  ✅ Saved comprehensive VTP with {polydata_out.GetCellData().GetNumberOfArrays()} field arrays")
-    print(f"  Field arrays:")
-    for i in range(polydata_out.GetCellData().GetNumberOfArrays()):
-        array_name = polydata_out.GetCellData().GetArrayName(i)
-        print(f"    - {array_name}")
+    print(f"  ✅ Saved VTP with {polydata_out.GetCellData().GetNumberOfArrays()} field arrays")
+    
+    print(f"\n  📊 Field Statistics:")
+    print(f"    Coarse Pressure: mean={coarse_pressure.mean():.4f}, std={coarse_pressure.std():.4f}")
+    print(f"    Fine Pressure:   mean={fine_pressure.mean():.4f}, std={fine_pressure.std():.4f}")
+    print(f"    Predicted Pressure: mean={pred_pressure.mean():.4f}, std={pred_pressure.std():.4f}")
+    print(f"    Pressure Error: mean={pressure_error.mean():.4f}, max={np.abs(pressure_error).max():.4f}")
 
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
 def main(cfg: DictConfig):
     print("="*80)
-    print("ENHANCED DoMINO MODEL TESTING - MESH INTERPOLATION FIXED")
+    print("TESTING ON TRAINING DATA - CASES 1-5")
     print("="*80)
-    print("Saving: Coarse + Fine (Interpolated) + Predicted + Error Fields")
+    print(f"Run timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("Testing on training data to diagnose distribution mismatch\n")
     
-    # Initialize distributed manager
     DistributedManager.initialize()
     dist = DistributedManager()
     
-    print(f"Config summary:\n{OmegaConf.to_yaml(cfg, sort_keys=True)}")
-    
-    # Verify enhanced mode is enabled
     if not cfg.data_processor.get('use_enhanced_features', False):
         print("ERROR: Enhanced features not enabled in config!")
-        print("Set 'use_enhanced_features: true' in config.yaml")
         return
     
-    # Get paths
-    coarse_test_path = cfg.eval.get('coarse_test_path', '/data/ahmed_data/organized/test/coarse/')
-    fine_test_path = cfg.eval.get('test_path', '/data/ahmed_data/organized/test/fine/')
-    save_path = cfg.eval.save_path
+    # CHANGED: Use TRAINING paths instead of test paths
+    coarse_train_path = '/data/ahmed_data/organized/train/coarse/'
+    fine_train_path = '/data/ahmed_data/organized/train/fine/'
     
-    # Create save directory
+    # Create output directory
+    date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    save_path = os.path.join(cfg.eval.save_path, f"train_test_{date_str}")
+    
     if dist.rank == 0:
         Path(save_path).mkdir(parents=True, exist_ok=True)
-    
-    # Model configuration
-    model_type = cfg.model.model_type
+        print(f"Output directory: {save_path}")
     
     # Surface variables
     surface_variable_names = list(cfg.variables.surface.solution.keys())
@@ -541,20 +431,23 @@ def main(cfg: DictConfig):
     
     # Load scaling factors
     surf_save_path = os.path.join(
-        cfg.eval.scaling_param_path, "surface_scaling_factors_inference.npy"
+        cfg.eval.scaling_param_path, "scaling_factors_enhanced.npy"
     )
     if os.path.exists(surf_save_path):
         surf_factors = np.load(surf_save_path).astype(np.float32)
-        print(f"Loaded surface scaling factors: {surf_factors}")
+        print(f"Loaded enhanced scaling factors: shape {surf_factors.shape}")
+        if surf_factors.shape[1] == 8:
+            print(f"  Coarse input scaling (4:8): mean={surf_factors[0, 4:8]}")
+            print(f"  Fine output scaling (0:4): mean={surf_factors[0, :4]}")
     else:
         surf_factors = None
-        print("Warning: No surface scaling factors found")
+        print("Warning: No scaling factors found")
     
-    # Create enhanced model with explicit float32
+    # Create model
     print("\nCreating Enhanced DoMINO model...")
     model = DoMINOEnhanced(
         input_features=3,
-        output_features_vol=None,  # Surface only for Ahmed
+        output_features_vol=None,
         output_features_surf=num_surf_vars,
         model_parameters=cfg.model,
     ).to(dist.device, dtype=torch.float32)
@@ -572,47 +465,38 @@ def main(cfg: DictConfig):
     model.load_state_dict(checkpoint)
     model.eval()
     
-    # Ensure model parameters are float32
     for param in model.parameters():
         if param.dtype != torch.float32:
-            print(f"Converting model parameter from {param.dtype} to float32")
             param.data = param.data.to(dtype=torch.float32)
     
-    print("Model loaded successfully with float32 parameters")
+    print("Model loaded successfully")
     
-    # Get test cases
-    coarse_test_cases = []
-    for case_dir in sorted(Path(coarse_test_path).iterdir()):
-        if case_dir.is_dir() and case_dir.name.startswith('run_'):
-            coarse_test_cases.append(case_dir.name)
+    # CHANGED: Test on training cases 1-5
+    training_cases = [f"run_{i}" for i in range(1, 6)]
+    print(f"\n🔍 Testing on {len(training_cases)} TRAINING cases to compare with test behavior")
     
-    print(f"\nProcessing {len(coarse_test_cases)} test cases")
-    
-    # Process each test case
     results_summary = []
     
-    for count, dirname in enumerate(coarse_test_cases[:5]):  # Test first 5 cases
+    for count, dirname in enumerate(training_cases):
         print(f"\n{'='*60}")
-        print(f"Processing: {dirname} ({count+1}/5)")
+        print(f"Processing TRAINING case: {dirname} ({count+1}/{len(training_cases)})")
         print(f"{'='*60}")
         
         tag = int(re.findall(r"(\w+?)(\d+)", dirname)[0][1])
         
-        # File paths
-        coarse_filepath = os.path.join(coarse_test_path, dirname)
-        fine_filepath = os.path.join(fine_test_path, dirname)
+        # File paths - using TRAINING directories
+        coarse_filepath = os.path.join(coarse_train_path, dirname)
+        fine_filepath = os.path.join(fine_train_path, dirname)
         
         stl_path = os.path.join(coarse_filepath, f"ahmed_{tag}.stl")
         coarse_vtp_path = os.path.join(coarse_filepath, f"boundary_{tag}.vtp")
         fine_vtp_path = os.path.join(fine_filepath, f"boundary_{tag}.vtp")
         
         # Output path
-        vtp_comprehensive_save_path = os.path.join(
-            save_path, f"boundary_{tag}_comprehensive_comparison.vtp"
-        )
+        vtp_output_path = os.path.join(save_path, f"train_run_{tag}_prediction.vtp")
         
         try:
-            # Load STL geometry (strict float32)
+            # Load STL geometry
             print(f"Loading geometry: {stl_path}")
             reader = pv.get_reader(stl_path)
             mesh_stl = reader.read()
@@ -624,10 +508,8 @@ def main(cfg: DictConfig):
             stl_sizes = np.array(stl_sizes.cell_data["Area"], dtype=np.float32)
             stl_centers = np.array(mesh_stl.cell_centers().points, dtype=np.float32)
             
-            # Calculate center of mass
             center_of_mass = calculate_center_of_mass(stl_centers, stl_sizes).astype(np.float32)
             
-            # Set bounding box
             if cfg.data.bounding_box_surface is None:
                 s_max = np.amax(stl_vertices, 0).astype(np.float32)
                 s_min = np.amin(stl_vertices, 0).astype(np.float32)
@@ -635,12 +517,10 @@ def main(cfg: DictConfig):
                 s_max = np.array(cfg.data.bounding_box_surface.max, dtype=np.float32)
                 s_min = np.array(cfg.data.bounding_box_surface.min, dtype=np.float32)
             
-            # Create grid for SDF (strict float32)
             nx, ny, nz = cfg.model.interp_res
             surf_grid = create_grid(s_max, s_min, [nx, ny, nz]).astype(np.float32)
             surf_grid_reshaped = surf_grid.reshape(nx * ny * nz, 3).astype(np.float32)
             
-            # Calculate SDF with proper data types
             sdf_surf_grid = signed_distance_field(
                 stl_vertices,
                 mesh_indices_flattened,
@@ -650,38 +530,45 @@ def main(cfg: DictConfig):
             
             surf_grid_max_min = np.array([s_min, s_max], dtype=np.float32)
             
-            # Load coarse surface data first (this will be our reference mesh)
-            print(f"Loading coarse surface data: {coarse_vtp_path}")
+            # Load coarse data
             coarse_data = load_coarse_vtp_data_robust(coarse_vtp_path, surface_variable_names)
             
-            # Load fine surface data and interpolate to coarse mesh coordinates
-            print(f"Loading and interpolating fine surface data: {fine_vtp_path}")
+            # Load and interpolate fine data
             fine_data = load_fine_vtp_data_and_interpolate(
                 fine_vtp_path, 
                 surface_variable_names, 
-                coarse_data['coordinates']  # Use coarse coordinates as target
+                coarse_data['coordinates']
             )
             
-            # Use coarse mesh as reference (since model is trained on coarse→fine)
+            # Normalize the coarse input fields
+            normalized_coarse_fields = coarse_data['fields'].copy()
+            if surf_factors is not None and surf_factors.shape[1] == 8:
+                input_mean = surf_factors[0, 4:8]
+                input_std = surf_factors[1, 4:8]
+                
+                normalized_coarse_fields = (coarse_data['fields'] - input_mean) / input_std
+                print(f"\nInput normalization applied:")
+                print(f"  Raw coarse pressure mean: {coarse_data['fields'][:, 0].mean():.4f}")
+                print(f"  Normalized coarse pressure mean: {normalized_coarse_fields[:, 0].mean():.4f}")
+            else:
+                print("WARNING: Could not find enhanced scaling factors for normalization!")
+            
             reference_mesh = coarse_data['mesh']
             surface_coordinates = coarse_data['coordinates'].astype(np.float32)
             
-            # Prepare surface neighbors (strict float32)
             interp_func = cKDTree(surface_coordinates)
             dd, ii = interp_func.query(surface_coordinates, k=cfg.eval.stencil_size + 1)
             surface_neighbors = surface_coordinates[ii[:, 1:]].astype(np.float32)
             surface_neighbors_normals = coarse_data['normals'][ii[:, 1:]].astype(np.float32)
             surface_neighbors_areas = coarse_data['areas'][ii[:, 1:]].astype(np.float32)
             
-            # Calculate positional encoding
             pos_surface_center_of_mass = (surface_coordinates - center_of_mass).astype(np.float32)
             
-            # Normalize coordinates (strict float32)
             surface_coordinates_norm = normalize(surface_coordinates, s_max, s_min).astype(np.float32)
             surface_neighbors_norm = normalize(surface_neighbors, s_max, s_min).astype(np.float32)
             surf_grid_norm = normalize(surf_grid, s_max, s_min).astype(np.float32)
             
-            # Prepare data dictionary for model (ALL float32)
+            # Prepare data for model
             data_dict = {
                 "geometry_coordinates": stl_vertices,
                 "surf_grid": surf_grid_norm,
@@ -692,7 +579,7 @@ def main(cfg: DictConfig):
                 "surface_neighbors_normals": surface_neighbors_normals,
                 "surface_areas": coarse_data['areas'],
                 "surface_neighbors_areas": surface_neighbors_areas,
-                "surface_fields": coarse_data['fields'],  # Only coarse features!
+                "surface_fields": normalized_coarse_fields,
                 "pos_surface_center_of_mass": pos_surface_center_of_mass,
                 "surface_min_max": surf_grid_max_min,
                 "length_scale": np.array([length_scale], dtype=np.float32),
@@ -700,18 +587,12 @@ def main(cfg: DictConfig):
                 "air_density": np.array([[AIR_DENSITY]], dtype=np.float32),
             }
             
-            # Verify all arrays are float32
             for k, v in data_dict.items():
                 if isinstance(v, np.ndarray) and v.dtype != np.float32:
-                    print(f"Converting {k} from {v.dtype} to float32")
                     data_dict[k] = v.astype(np.float32)
             
-            print(f"Input surface fields shape: {coarse_data['fields'].shape}")
-            print(f"Interpolated fine fields shape: {fine_data['fields'].shape}")
-            print("  (Both should have same number of cells now)")
-            
             # Get predictions
-            print("Running enhanced model prediction...")
+            print("Running model prediction...")
             start_time = time.time()
             prediction_surf = test_enhanced_model(
                 data_dict, model, dist.device, cfg, surf_factors
@@ -720,17 +601,27 @@ def main(cfg: DictConfig):
             print(f"Prediction completed in {elapsed_time:.2f} seconds")
             
             if prediction_surf is not None:
-                prediction_surf = prediction_surf[0] if isinstance(prediction_surf, np.ndarray) else prediction_surf[0].cpu().numpy()  # Remove batch dimension
+                prediction_surf = prediction_surf[0] if isinstance(prediction_surf, np.ndarray) else prediction_surf[0].cpu().numpy()
                 
-                # Now all arrays have the same dimensions - calculate forces
+                # Save VTP file
+                save_comprehensive_vtp(
+                    output_path=vtp_output_path,
+                    base_mesh=reference_mesh,
+                    coarse_fields=coarse_data['fields'],
+                    fine_fields_interpolated=fine_data['fields'],
+                    predicted_fields=prediction_surf,
+                    surface_variable_names=surface_variable_names,
+                    coarse_info=coarse_data['field_info'],
+                    fine_info=fine_data['field_info']
+                )
+                
+                # Calculate coefficients
                 surface_areas = coarse_data['areas'].reshape(-1, 1)
                 surface_normals = coarse_data['normals']
                 
-                # Calculate integrated force coefficients (no need for frontal area)
-                # The coefficients are already non-dimensional
                 print(f"\nIntegrated Coefficient Comparison:")
-
-                # Integrated drag coefficient (Cdx)
+                
+                # Drag coefficient
                 Cdx_coarse = np.sum(
                     coarse_data['fields'][:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
                     - coarse_data['fields'][:, 1] * surface_areas[:, 0]
@@ -743,83 +634,23 @@ def main(cfg: DictConfig):
                     prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
                     - prediction_surf[:, 1] * surface_areas[:, 0]
                 )
-
-                print(f"  Integrated Drag Coefficient:")
-                print(f"    Coarse:    {Cdx_coarse:.6f}")
-                print(f"    Fine:      {Cdx_fine:.6f}")
-                print(f"    Predicted: {Cdx_pred:.6f}")
-
-                # Calculate improvement
+                
                 coarse_to_fine_drag_error = abs(Cdx_coarse - Cdx_fine)
                 pred_to_fine_drag_error = abs(Cdx_pred - Cdx_fine)
                 if coarse_to_fine_drag_error > 1e-10:
                     drag_improvement = (coarse_to_fine_drag_error - pred_to_fine_drag_error) / coarse_to_fine_drag_error * 100
                 else:
                     drag_improvement = 0.0
-
-                print(f"    Baseline error: {coarse_to_fine_drag_error:.6f}")
-                print(f"    Prediction error: {pred_to_fine_drag_error:.6f}")
-                print(f"    Improvement: {drag_improvement:.1f}%")
-
-                # Integrated lift coefficient (Clz)
-                Clz_coarse = np.sum(
-                    coarse_data['fields'][:, 0] * surface_normals[:, 2] * surface_areas[:, 0]
-                    - coarse_data['fields'][:, 3] * surface_areas[:, 0]
-                )
-                Clz_fine = np.sum(
-                    fine_data['fields'][:, 0] * surface_normals[:, 2] * surface_areas[:, 0]
-                    - fine_data['fields'][:, 3] * surface_areas[:, 0]
-                )
-                Clz_pred = np.sum(
-                    prediction_surf[:, 0] * surface_normals[:, 2] * surface_areas[:, 0]
-                    - prediction_surf[:, 3] * surface_areas[:, 0]
-                )
-
-                print(f"\n  Integrated Lift Coefficient:")
-                print(f"    Coarse:    {Clz_coarse:.6f}")
-                print(f"    Fine:      {Clz_fine:.6f}")
-                print(f"    Predicted: {Clz_pred:.6f}")
-
-                # Calculate improvement
-                coarse_to_fine_lift_error = abs(Clz_coarse - Clz_fine)
-                pred_to_fine_lift_error = abs(Clz_pred - Clz_fine)
-                if coarse_to_fine_lift_error > 1e-10:
-                    lift_improvement = (coarse_to_fine_lift_error - pred_to_fine_lift_error) / coarse_to_fine_lift_error * 100
-                else:
-                    lift_improvement = 0.0
-
-                print(f"    Baseline error: {coarse_to_fine_lift_error:.6f}")
-                print(f"    Prediction error: {pred_to_fine_lift_error:.6f}")
-                print(f"    Improvement: {lift_improvement:.1f}%")
-
-                # Store results with coefficient naming
+                
+                print(f"  Drag: Coarse={Cdx_coarse:.6f}, Fine={Cdx_fine:.6f}, Pred={Cdx_pred:.6f}, Improvement={drag_improvement:.1f}%")
+                
                 results_summary.append({
                     'case': dirname,
-                    'case_number': tag,
-                    'drag_coeff_coarse': Cdx_coarse,
-                    'drag_coeff_fine': Cdx_fine,
-                    'drag_coeff_pred': Cdx_pred,
-                    'drag_improvement': drag_improvement,
-                    'lift_coeff_coarse': Clz_coarse,
-                    'lift_coeff_fine': Clz_fine,
-                    'lift_coeff_pred': Clz_pred,
-                    'lift_improvement': lift_improvement,
-                    'processing_time': elapsed_time
+                    'coarse_pressure_mean': coarse_data['fields'][:, 0].mean(),
+                    'fine_pressure_mean': fine_data['fields'][:, 0].mean(),
+                    'pred_pressure_mean': prediction_surf[:, 0].mean(),
+                    'drag_improvement': drag_improvement
                 })
-                
-                # ADDED: Save the comprehensive VTP file with all results
-                print(f"Saving comprehensive VTP to: {vtp_comprehensive_save_path}")
-                save_comprehensive_vtp(
-                    output_path=vtp_comprehensive_save_path,
-                    base_mesh=reference_mesh,
-                    coarse_fields=coarse_data['fields'],
-                    fine_fields_interpolated=fine_data['fields'],
-                    predicted_fields=prediction_surf[0] if len(prediction_surf.shape) > 2 else prediction_surf,
-                    surface_variable_names=surface_variable_names,
-                    coarse_info=coarse_data['field_info'],
-                    fine_info=fine_data['field_info']
-                )
-                print(f"✅ VTP saved successfully")
                 
         except Exception as e:
             print(f"  ❌ Error processing {dirname}: {str(e)}")
@@ -827,53 +658,24 @@ def main(cfg: DictConfig):
             traceback.print_exc()
             continue
     
-    # Print comprehensive summary
+    # Summary
     print(f"\n{'='*80}")
-    print("ENHANCED MODEL TESTING COMPLETED - COMPREHENSIVE COMPARISON")
+    print("TRAINING DATA TEST SUMMARY")
     print(f"{'='*80}")
-    print(f"Successfully processed: {len(results_summary)}/5 test cases")
     
     if results_summary:
-        # Change the headers from "Force Predictions" to "Coefficient Predictions"
-        print(f"\nCoefficient Predictions Summary:")
-        print(f"{'Case':<8} {'Coarse Cd':<12} {'Fine Cd':<12} {'Pred Cd':<12} {'Improvement':<12}")
-        print(f"{'':8} {'Coarse Cl':<12} {'Fine Cl':<12} {'Pred Cl':<12} {'Improvement':<12}")
-        print("-" * 80)
-        for result in results_summary:
-            print(f"{result['case']:<8} {result['drag_coeff_coarse']:<12.6f} "
-                f"{result['drag_coeff_fine']:<12.6f} {result['drag_coeff_pred']:<12.6f} {result['drag_improvement']:<12.1f}%")
-            print(f"{'':8} {result['lift_coeff_coarse']:<12.6f} "
-                f"{result['lift_coeff_fine']:<12.6f} {result['lift_coeff_pred']:<12.6f} {result['lift_improvement']:<12.1f}%")
-            print()
+        print("\n📊 Pressure Field Comparison (Training vs Test):")
+        print(f"{'Case':<10} {'Coarse Mean':<15} {'Fine Mean':<15} {'Pred Mean':<15}")
+        print("-" * 60)
+        for r in results_summary:
+            print(f"{r['case']:<10} {r['coarse_pressure_mean']:>14.4f} {r['fine_pressure_mean']:>14.4f} {r['pred_pressure_mean']:>14.4f}")
         
-        # Calculate average improvements
-        avg_drag_improvement = np.mean([r['drag_improvement'] for r in results_summary])
-        avg_lift_improvement = np.mean([r['lift_improvement'] for r in results_summary])
-        
-        print(f"\n📊 OVERALL PERFORMANCE:")
-        print(f"  Average drag prediction improvement over coarse: {avg_drag_improvement:.1f}%")
-        print(f"  Average lift prediction improvement over coarse: {avg_lift_improvement:.1f}%")
-    
-    print(f"\n🎉 Enhanced DoMINO comprehensive testing completed successfully!")
-    print(f"\n📁 Output VTP files contain:")
-    print(f"  - Coarse_Pressure & Coarse_WallShearStress (input)")
-    print(f"  - Fine_Pressure_GroundTruth_Interpolated & Fine_WallShearStress_GroundTruth_Interpolated")
-    print(f"  - Predicted_Pressure & Predicted_WallShearStress")
-    print(f"  - Error_Pressure_vs_Fine & Error_WallShearStress_vs_Fine")
-    print(f"  - Error_Coarse_vs_Fine & Error_CoarseShear_vs_Fine (baseline errors)")
-    print(f"  - RelativeError_Pressure_Percent & RelativeError_WallShearStress_Percent")
-    print(f"\n💡 In ParaView:")
-    print(f"  1. Load the VTP files from: {save_path}")
-    print(f"  2. Use 'Coarse_*' fields to see input data")
-    print(f"  3. Use 'Fine_*_GroundTruth_Interpolated' fields to see target data")
-    print(f"  4. Use 'Predicted_*' fields to see model predictions")
-    print(f"  5. Use 'Error_*_vs_Fine' fields to see prediction errors")
-    print(f"  6. Use 'Error_Coarse_vs_Fine' fields to see baseline errors")
-    print(f"  7. Color by different fields to compare visually")
-    print(f"\n🔧 Key Fix Applied:")
-    print(f"  ✅ Fine mesh data interpolated to coarse mesh coordinates")
-    print(f"  ✅ All field arrays now have matching dimensions")
-    print(f"  ✅ Proper error calculation and improvement metrics")
+        print("\n🔍 KEY OBSERVATION:")
+        print("  Training data pressure values vs Test data:")
+        print(f"  - Training coarse mean: {np.mean([r['coarse_pressure_mean'] for r in results_summary]):.4f}")
+        print(f"  - Test data coarse mean: ~-0.11")
+        print("\n  If training shows similar problems, the model learned incorrectly.")
+        print("  If training works well, there's a train/test distribution mismatch.")
 
 
 if __name__ == "__main__":
