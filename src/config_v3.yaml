@@ -1,0 +1,251 @@
+# config_v3.yaml
+# Complete configuration for Enhanced DoMINO V3 with coefficient learning
+
+defaults:
+  - _self_
+
+# Project configuration
+project:
+  name: Ahmed_Dataset
+
+exp_tag: enhanced_v3_coefficients
+
+# Main output directory
+project_dir: outputs/${project.name}/
+output: outputs/${project.name}/${exp_tag}
+
+hydra:
+  run:
+    dir: ${output}
+  output_subdir: hydra
+
+# Data preprocessing configuration
+data_processor:
+  kind: ahmed
+  output_dir: /data/ahmed_data/processed/train/
+  input_dir: /data/ahmed_data/organized/train/fine/
+  cached_dir: /data/ahmed_data/ahmed_data/cached/
+  use_cache: false
+  num_processors: 8
+
+  # Enhanced features configuration
+  use_enhanced_features: true
+  coarse_input_dir: /data/ahmed_data/organized/train/coarse/
+
+  # Coefficient data paths
+  coefficient_path: /mnt/windows/ahmed-ml-project/ahmed_data/organized/
+
+# Solution variables
+variables:
+  surface:
+    solution:
+      pMean: scalar
+      wallShearStressMean: vector
+
+    # Enhanced features configuration
+    enhanced_features:
+      input_feature_count: 8  # 4 fine + 4 coarse interpolated features
+      coarse_variable_mapping:
+        pMean: p
+        wallShearStressMean: wallShearStress
+
+  # Volume variables (even if not used, needed for config)
+  volume:
+    solution:
+      UMeanTrim: vector
+      pMeanTrim: scalar
+      nutMeanTrim: scalar
+
+# Training data configuration
+data:
+  input_dir: /data/ahmed_data/processed/train/
+  input_dir_val: /data/ahmed_data/processed/val/
+
+  # Bounding boxes based on Ahmed geometry
+  bounding_box:
+    min: [-4.0, -1.0, 0.0]
+    max: [6.0, 1.0, 1.4]
+
+  bounding_box_surface:
+    min: [-1.5, -0.4, 0.0]
+    max: [1.0, 0.4, 0.5]
+
+  gpu_preprocessing: true
+  gpu_output: true
+
+# Domain parallelism settings
+domain_parallelism:
+  domain_size: 1
+  shard_grid: false
+  shard_points: false
+
+# Model configuration V3 with coefficient prediction
+model:
+  model_type: surface
+  activation: "gelu"
+
+  # ENABLE MULTI-TASK LEARNING
+  use_physics_loss: true
+  use_multitask_loss: true  # NEW: Enable multi-task loss
+
+  loss_function:
+    loss_type: "mse"
+    area_weighing_factor: 10000
+
+  interp_res: [128, 64, 64]
+  use_sdf_in_basis_func: true
+  positional_encoding: false
+
+  # Sampling parameters
+  volume_points_sample: 0  # Surface only
+  surface_points_sample: 32768
+  geom_points_sample: 500_000
+  surface_sampling_algorithm: area_weighted
+  surface_neighbors: true
+  num_surface_neighbors: 7
+  use_surface_normals: true
+  use_surface_area: true
+  integral_loss_scaling_factor: 100
+  normalization: min_max_scaling
+  encode_parameters: false
+
+  # Loss scaling
+  surf_loss_scaling: 0.5
+  vol_loss_scaling: 0.0   # Surface only
+
+  geometry_encoding_type: both
+  solution_calculation_mode: two-loop
+
+  resampling_surface_mesh:
+    resample: false
+    points: 1_000_000
+
+  # Geometry representation hyperparameters
+  geometry_rep:
+    geo_conv:
+      base_neurons: 64
+      base_neurons_out: 1
+      volume_radii: [0.1, 0.5, 2.5, 5.0]
+      surface_radii: [0.01, 0.05, 0.1]
+      hops: 1
+      activation: ${model.activation}
+    geo_processor:
+      base_filters: 8
+      activation: ${model.activation}
+    geo_processor_sdf:
+      base_filters: 8
+
+  nn_basis_functions:
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+    activation: ${model.activation}
+
+  local_point_conv:
+    activation: ${model.activation}
+
+  aggregation_model:
+    base_layer: 512
+    activation: ${model.activation}
+
+  position_encoder:
+    base_neurons: 512
+
+  geometry_local:
+    volume_neighbors_in_radius: [64, 128, 256]
+    surface_neighbors_in_radius: [64, 128, 256]
+    volume_radii: [0.05, 0.25, 1.0]
+    surface_radii: [0.05, 0.25, 1.0]
+    base_layer: 512
+
+  # Parameter model configuration
+  parameter_model:
+    base_layer: 512
+    scaling_params: [1.0, 1.0]
+    fourier_features: false
+    num_modes: 5
+
+  # ENHANCED MODEL V3 - With coefficient prediction
+  enhanced_model:
+    surface_input_features: 8
+    debug: false
+    monitor_training: true
+
+    # NEW: Enable coefficient prediction
+    predict_coefficients: true
+
+    coarse_to_fine:
+      hidden_layers: [256, 128]
+      use_spectral: false
+      use_residual: true
+      dropout_rate: 0.2
+      activation: gelu
+
+      # Weight constraints for physics-aware training
+      residual_weight_min: 0.7
+      residual_weight_max: 1.0
+      correction_weight_max: 0.3
+
+# Multi-task loss configuration
+multitask_loss:
+  surface_weight: 0.7
+  coefficient_weight: 0.3
+  physics_weight: 0.1
+  use_physics_constraints: true
+
+# Training configuration
+train:
+  epochs: 500
+  checkpoint_interval: 10
+  learning_rate: 0.0001
+
+  dataloader:
+    batch_size: 1  # MUST be 1 due to ball query limitation
+    pin_memory: false
+
+  sampler:
+    shuffle: true
+    drop_last: false
+
+  checkpoint_dir: null  # Start fresh
+
+  # Early stopping configuration
+  early_stopping:
+    enabled: true
+    patience: 30
+    min_delta: 0.0001
+    metric: total_loss
+
+  # Learning rate scheduler
+  lr_scheduler:
+    enabled: true
+    type: ReduceLROnPlateau
+    factor: 0.5
+    patience: 15
+    min_lr: 0.00001
+
+# Validation configuration
+val:
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  sampler:
+    shuffle: true
+    drop_last: false
+
+# Testing/evaluation configuration
+eval:
+  test_path: /data/ahmed_data/organized/test/fine/
+  coarse_test_path: /data/ahmed_data/organized/test/coarse/
+  save_path: /data/ahmed_data/predictions_v3/
+  checkpoint_name: best_model.pt
+  scaling_param_path: outputs/Ahmed_Dataset/enhanced_v3_coefficients
+  refine_stl: false
+  stencil_size: 7
+
+  # Coefficient evaluation
+  evaluate_coefficients: true
+  coefficient_path: /mnt/windows/ahmed-ml-project/ahmed_data/organized/
+
+# Resume directory for model loading
+resume_dir: outputs/Ahmed_Dataset/enhanced_v3_coefficients/models/
