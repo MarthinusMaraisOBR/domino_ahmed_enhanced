@@ -66,9 +66,7 @@ from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 import time
 
 # Import the enhanced model (only once!)
-from enhanced_domino_model_v3 import DoMINOEnhancedV3
-from coefficient_data_loader import EnhancedDatasetWithCoefficients
-from multitask_loss import MultiTaskLoss
+from enhanced_domino_model import DoMINOEnhanced
 
 from physicsnemo.utils.profiling import profile, Profiler
 
@@ -758,7 +756,6 @@ def train_epoch_enhanced_physics(
     vol_loss_scaling=None,
     surf_loss_scaling=None,
     use_physics_loss=False,
-    cfg=None,  # Add cfg parameter
 ):
     """Enhanced training with physics-aware loss and monitoring."""
     
@@ -788,60 +785,19 @@ def train_epoch_enhanced_physics(
             coarse_surf = surface_fields_all[..., 4:8]  # Coarse features
             
             if use_physics_loss:
-                # Get surface data
+                # Use physics-aware loss
                 surface_areas = sampled_batched["surface_areas"]
                 surface_areas = torch.unsqueeze(surface_areas, -1)
                 surface_normals = sampled_batched["surface_normals"]
                 
-                # Check if using multi-task loss with coefficients
-                use_multitask = (
-                    cfg.model.get('use_multitask_loss', False) and
-                    cfg.model.enhanced_model.get('predict_coefficients', False)
+                total_loss, loss_components = physics_loss_fn(
+                    prediction_surf,
+                    target_surf,
+                    coarse_surf,
+                    surface_areas,
+                    surface_normals,
+                    model
                 )
-                
-                if use_multitask:
-                    # Initialize multi-task loss if not already created
-                    if 'multitask_loss_fn' not in locals():
-                        multitask_loss_fn = MultiTaskLoss(
-                            surface_weight=cfg.multitask_loss.get('surface_weight', 0.7),
-                            coefficient_weight=cfg.multitask_loss.get('coefficient_weight', 0.3),
-                            physics_weight=cfg.multitask_loss.get('physics_weight', 0.1),
-                        )
-                    
-                    # Get coefficient targets and predictions
-                    coeff_targets = sampled_batched.get('fine_coefficients', None)
-                    
-                    # Get predictions from model
-                    if hasattr(model, 'module'):  # DDP wrapper
-                        actual_model = model.module
-                    else:
-                        actual_model = model
-                    
-                    coeff_predictions = None
-                    if hasattr(actual_model, 'get_coefficients'):
-                        coeff_predictions = actual_model.get_coefficients()
-                    
-                    # Use multi-task loss
-                    total_loss, loss_components = multitask_loss_fn(
-                        pred_surface=prediction_surf,
-                        target_surface=target_surf,
-                        pred_coefficients=coeff_predictions,
-                        target_coefficients=coeff_targets,
-                        coarse_surface=coarse_surf,
-                        surface_areas=surface_areas,
-                        surface_normals=surface_normals,
-                        model=actual_model
-                    )
-                else:
-                    # Use standard physics loss
-                    total_loss, loss_components = physics_loss_fn(
-                        prediction_surf,
-                        target_surf,
-                        coarse_surf,
-                        surface_areas,
-                        surface_normals,
-                        model
-                    )
                 
                 # Add model regularization
                 if hasattr(model, 'get_regularization_loss'):
@@ -1066,59 +1022,22 @@ def main(cfg: DictConfig) -> None:
         surf_factors = None
 
     # Create datasets
-    # Create datasets - check for coefficient support
-    use_coefficient_data = (
-        use_enhanced_features and 
-        cfg.model.enhanced_model.get('predict_coefficients', False) and
-        cfg.data_processor.get('coefficient_path')
+    train_dataset = create_domino_dataset(
+        cfg,
+        phase="train",
+        volume_variable_names=volume_variable_names,
+        surface_variable_names=surface_variable_names,
+        vol_factors=vol_factors,
+        surf_factors=surf_factors,
     )
-    
-    if use_coefficient_data:
-        logger.info("\n" + "="*60)
-        logger.info("LOADING ENHANCED DATASETS WITH COEFFICIENT DATA")
-        logger.info("="*60)
-        logger.info(f"  Coefficient path: {cfg.data_processor.coefficient_path}")
-        
-        train_dataset = EnhancedDatasetWithCoefficients(
-            npy_data_path=cfg.data.input_dir,
-            coefficient_path=cfg.data_processor.coefficient_path,
-            split="train",
-            use_enhanced_features=True,
-            normalize_coefficients=True,
-        )
-        
-        val_dataset = EnhancedDatasetWithCoefficients(
-            npy_data_path=cfg.data.input_dir_val,
-            coefficient_path=cfg.data_processor.coefficient_path,
-            split="val",
-            use_enhanced_features=True,
-            normalize_coefficients=True,
-        )
-        
-        # Verify coefficient data
-        sample = train_dataset[0]
-        if 'fine_coefficients' in sample:
-            logger.info("  ✓ Coefficient data confirmed in dataset")
-        else:
-            raise ValueError("Coefficient data not found when predict_coefficients=True")
-    else:
-        # Standard dataset creation
-        train_dataset = create_domino_dataset(
-            cfg,
-            phase="train",
-            volume_variable_names=volume_variable_names,
-            surface_variable_names=surface_variable_names,
-            vol_factors=vol_factors,
-            surf_factors=surf_factors,
-        )
-        val_dataset = create_domino_dataset(
-            cfg,
-            phase="val",
-            volume_variable_names=volume_variable_names,
-            surface_variable_names=surface_variable_names,
-            vol_factors=vol_factors,
-            surf_factors=surf_factors,
-        )
+    val_dataset = create_domino_dataset(
+        cfg,
+        phase="val",
+        volume_variable_names=volume_variable_names,
+        surface_variable_names=surface_variable_names,
+        vol_factors=vol_factors,
+        surf_factors=surf_factors,
+    )
 
     # Create data loaders
     train_sampler = DistributedSampler(
@@ -1147,36 +1066,23 @@ def main(cfg: DictConfig) -> None:
     )
 
     # Model creation - use enhanced model if configured
-    # Model creation - use V3 if coefficients enabled, otherwise enhanced or standard
     if use_enhanced_features:
-        predict_coefficients = cfg.model.enhanced_model.get('predict_coefficients', False)
+        logger.info("\nCreating DoMINOEnhanced model for coarse-to-fine prediction...")
+        model = DoMINOEnhanced(
+            input_features=3,
+            output_features_vol=num_vol_vars,
+            output_features_surf=num_surf_vars,
+            model_parameters=cfg.model,
+        ).to(dist.device)
+        logger.info("  Enhanced model created successfully")
         
-        if predict_coefficients:
-            logger.info("\n" + "="*60)
-            logger.info("CREATING DoMINOEnhancedV3 WITH COEFFICIENT PREDICTION")
-            logger.info("="*60)
-            model = DoMINOEnhancedV3(
-                input_features=3,
-                output_features_vol=num_vol_vars,
-                output_features_surf=num_surf_vars,
-                model_parameters=cfg.model,
-            ).to(dist.device)
-            logger.info("  ✓ V3 model with coefficient prediction created")
-        else:
-            logger.info("\nCreating DoMINOEnhanced model for coarse-to-fine prediction...")
-            model = DoMINOEnhanced(
-                input_features=3,
-                output_features_vol=num_vol_vars,
-                output_features_surf=num_surf_vars,
-                model_parameters=cfg.model,
-            ).to(dist.device)
-            logger.info("  Enhanced model created (without coefficients)")
-        
-        # Log configuration
+        # Log enhanced configuration
         enhanced_config = cfg.model.get('enhanced_model', {})
         logger.info(f"  Surface input features: {enhanced_config.get('surface_input_features', 4)}")
-        logger.info(f"  Coefficient prediction: {predict_coefficients}")
+        logger.info(f"  Use spectral: {enhanced_config.get('coarse_to_fine', {}).get('use_spectral', False)}")
+        logger.info(f"  Use residual: {enhanced_config.get('coarse_to_fine', {}).get('use_residual', True)}")
         
+        # Log weight constraints if using physics loss
         if use_physics_loss:
             c2f_config = enhanced_config.get('coarse_to_fine', {})
             logger.info(f"  Weight constraints:")
@@ -1311,7 +1217,6 @@ def main(cfg: DictConfig) -> None:
                     vol_loss_scaling=cfg.model.vol_loss_scaling,
                     surf_loss_scaling=surface_scaling_loss,
                     use_physics_loss=True,
-                    cfg=cfg,  # Add config parameter
                 )
                 
                 # Extract metrics from training if available
