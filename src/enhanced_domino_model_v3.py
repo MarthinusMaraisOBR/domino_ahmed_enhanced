@@ -149,9 +149,11 @@ class CoarseToFineModelV3(nn.Module):
         self.output_projection = nn.Linear(hidden_layers[-1], output_dim)
         
         # Coefficient prediction head
+        # Coefficient prediction head
         if predict_coefficients:
-            # Input: predicted surface fields (4) + surface features (128) + encoding (448)
-            coeff_input_dim = output_dim + 128 + encoding_dim
+            # Fixed: Input dimension should match what we actually concatenate
+            # surface_mean (4) + surface_max (4) + encoding_mean (448) = 456
+            coeff_input_dim = output_dim * 2 + encoding_dim  # 4*2 + 448 = 456
             self.coefficient_head = CoefficientPredictionHead(
                 input_dim=coeff_input_dim,
                 hidden_dims=[256, 128, 64],
