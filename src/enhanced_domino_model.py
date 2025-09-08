@@ -196,7 +196,6 @@ class CoarseToFineModel(nn.Module):
         # Output projection (simplified)
         self.output_projection = nn.Sequential(
             nn.Linear(hidden_layers[-1], output_dim),
-            nn.Tanh()  # Added to bound outputs
         )
         
         # Residual connection (DISABLED by default)

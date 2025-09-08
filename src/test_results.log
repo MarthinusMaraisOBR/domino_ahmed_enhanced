@@ -1,0 +1,477 @@
+/usr/local/lib/python3.12/dist-packages/physicsnemo/distributed/manager.py:415: UserWarning: Could not initialize using ENV, SLURM or OPENMPI methods. Assuming this is a single process job
+  warn(
+Traceback (most recent call last):
+  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 743, in main
+    prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
+    ~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+  File "/usr/local/lib/python3.12/dist-packages/torch/_tensor.py", line 1225, in __array__
+    return self.numpy()
+           ^^^^^^^^^^^^
+TypeError: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+================================================================================
+ENHANCED DoMINO MODEL TESTING - MESH INTERPOLATION FIXED
+================================================================================
+Saving: Coarse + Fine (Interpolated) + Predicted + Error Fields
+Config summary:
+data:
+  bounding_box:
+    max:
+    - 6.0
+    - 1.0
+    - 1.4
+    min:
+    - -4.0
+    - -1.0
+    - 0.0
+  bounding_box_surface:
+    max:
+    - 1.0
+    - 0.4
+    - 0.5
+    min:
+    - -1.5
+    - -0.4
+    - 0.0
+  gpu_output: true
+  gpu_preprocessing: true
+  input_dir: /data/ahmed_data/processed/train/
+  input_dir_val: /data/ahmed_data/processed/val/
+data_processor:
+  cached_dir: /data/ahmed_data/ahmed_data/cached/
+  coarse_input_dir: /data/ahmed_data/organized/train/coarse/
+  input_dir: /data/ahmed_data/organized/train/fine/
+  kind: ahmed
+  num_processors: 8
+  output_dir: /data/ahmed_data/processed/train/
+  use_cache: false
+  use_enhanced_features: true
+domain_parallelism:
+  domain_size: 1
+  shard_grid: false
+  shard_points: false
+eval:
+  checkpoint_name: DoMINOEnhanced.0.49.pt
+  coarse_test_path: /data/ahmed_data/organized/test/coarse/
+  refine_stl: false
+  save_path: /data/ahmed_data/predictions_fixed/
+  scaling_param_path: outputs/Ahmed_Dataset/enhanced_fixed
+  stencil_size: 7
+  test_path: /data/ahmed_data/organized/test/fine/
+exp_tag: '11'
+model:
+  activation: relu
+  aggregation_model:
+    activation: ${model.activation}
+    base_layer: 512
+  encode_parameters: false
+  enhanced_model:
+    coarse_to_fine:
+      activation: ${model.activation}
+      dropout_rate: 0.1
+      hidden_layers:
+      - 256
+      - 256
+      use_residual: false
+      use_spectral: false
+    debug: true
+    surface_input_features: 8
+  geom_points_sample: 100000
+  geometry_encoding_type: both
+  geometry_local:
+    base_layer: 512
+    surface_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    surface_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+    volume_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    volume_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+  geometry_rep:
+    geo_conv:
+      activation: ${model.activation}
+      base_neurons: 32
+      base_neurons_out: 1
+      hops: 1
+      surface_radii:
+      - 0.01
+      - 0.05
+      - 0.1
+      volume_radii:
+      - 0.1
+      - 0.5
+      - 2.5
+      - 5.0
+    geo_processor:
+      activation: ${model.activation}
+      base_filters: 8
+    geo_processor_sdf:
+      base_filters: 8
+  integral_loss_scaling_factor: 100
+  interp_res:
+  - 128
+  - 64
+  - 64
+  local_point_conv:
+    activation: ${model.activation}
+  loss_function:
+    area_weighing_factor: 10000
+    loss_type: mse
+  model_type: surface
+  nn_basis_functions:
+    activation: ${model.activation}
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+  normalization: min_max_scaling
+  num_surface_neighbors: 7
+  parameter_model:
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+    scaling_params:
+    - 1.0
+    - 1.0
+  position_encoder:
+    base_neurons: 512
+  positional_encoding: false
+  resampling_surface_mesh:
+    points: 1000000
+    resample: false
+  solution_calculation_mode: two-loop
+  surf_loss_scaling: 1.0
+  surface_neighbors: true
+  surface_points_sample: 8192
+  surface_sampling_algorithm: area_weighted
+  use_sdf_in_basis_func: true
+  use_surface_area: true
+  use_surface_normals: true
+  vol_loss_scaling: 0.0
+  volume_points_sample: 0
+output: outputs/${project.name}/${exp_tag}
+project:
+  name: Ahmed_Dataset
+project_dir: outputs/${project.name}/
+resume_dir: ${output}/models
+train:
+  checkpoint_dir: null
+  checkpoint_interval: 25
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  epochs: 50
+  sampler:
+    drop_last: false
+    shuffle: true
+val:
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  sampler:
+    drop_last: false
+    shuffle: true
+variables:
+  surface:
+    enhanced_features:
+      coarse_variable_mapping:
+        pMean: p
+        wallShearStressMean: wallShearStress
+      input_feature_count: 8
+    solution:
+      pMean: scalar
+      wallShearStressMean: vector
+  volume:
+    solution:
+      UMeanTrim: vector
+      nutMeanTrim: scalar
+      pMeanTrim: scalar
+
+Warning: No surface scaling factors found
+
+Creating Enhanced DoMINO model...
+
+============================================================
+Initializing DoMINOEnhanced for coarse-to-fine prediction
+============================================================
+[CoarseToFineModel] Initializing with:
+  - Input dim: 4
+  - Output dim: 4
+  - Encoding dim: 448
+  - Hidden layers: [256, 256]
+  - Use spectral: False
+  - Use residual: False ⚠️ DISABLED - was causing issues
+
+DoMINOEnhanced initialized:
+  - Input: 4 coarse features + 448D geometry
+  - Output: 4 fine features
+  - Debug mode: True
+============================================================
+
+Loading checkpoint: outputs/Ahmed_Dataset/11/models/DoMINOEnhanced.0.49.pt
+Model loaded successfully with float32 parameters
+
+Processing 50 test cases
+
+============================================================
+Processing: run_451 (1/5)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test/coarse/run_451/ahmed_451.stl
+Loading coarse surface data: /data/ahmed_data/organized/test/coarse/run_451/boundary_451.vtp
+Loading coarse data: /data/ahmed_data/organized/test/coarse/run_451/boundary_451.vtp
+  Coarse mesh: 124252 cells, 128769 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 124252 cells
+  Coarse surface fields shape: (124252, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test/fine/run_451/boundary_451.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test/fine/run_451/boundary_451.vtp
+  Fine mesh: 1215720 cells, 1247558 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1215720 cells) to coarse mesh (124252 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (124252, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (124252, 4)
+Interpolated fine fields shape: (124252, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: -0.0277, std: 0.0930
+  Predictions - mean: 0.2161, std: 0.2483
+Prediction completed in 0.49 seconds
+  ❌ Error processing run_451: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+
+============================================================
+Processing: run_452 (2/5)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test/coarse/run_452/ahmed_452.stl
+Loading coarse surface data: /data/ahmed_data/organized/test/coarse/run_452/boundary_452.vtp
+Loading coarse data: /data/ahmed_data/organized/test/coarse/run_452/boundary_452.vtp
+  Coarse mesh: 94194 cells, 97867 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 94194 cells
+  Coarse surface fields shape: (94194, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test/fine/run_452/boundary_452.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test/fine/run_452/boundary_452.vtp
+  Fine mesh: 875394 cells, 899688 points
+Traceback (most recent call last):
+  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 743, in main
+    prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
+    ~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+  File "/usr/local/lib/python3.12/dist-packages/torch/_tensor.py", line 1225, in __array__
+    return self.numpy()
+           ^^^^^^^^^^^^
+TypeError: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+Traceback (most recent call last):
+  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 743, in main
+    prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
+    ~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+  File "/usr/local/lib/python3.12/dist-packages/torch/_tensor.py", line 1225, in __array__
+    return self.numpy()
+           ^^^^^^^^^^^^
+TypeError: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+Traceback (most recent call last):
+  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 743, in main
+    prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
+    ~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+  File "/usr/local/lib/python3.12/dist-packages/torch/_tensor.py", line 1225, in __array__
+    return self.numpy()
+           ^^^^^^^^^^^^
+TypeError: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+Traceback (most recent call last):
+  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 743, in main
+    prediction_surf[:, 0] * surface_normals[:, 0] * surface_areas[:, 0]
+    ~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+  File "/usr/local/lib/python3.12/dist-packages/torch/_tensor.py", line 1225, in __array__
+    return self.numpy()
+           ^^^^^^^^^^^^
+TypeError: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (875394 cells) to coarse mesh (94194 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (94194, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (94194, 4)
+Interpolated fine fields shape: (94194, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: -0.0274, std: 0.0922
+  Predictions - mean: 0.2165, std: 0.2468
+Prediction completed in 0.15 seconds
+  ❌ Error processing run_452: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+
+============================================================
+Processing: run_453 (3/5)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test/coarse/run_453/ahmed_453.stl
+Loading coarse surface data: /data/ahmed_data/organized/test/coarse/run_453/boundary_453.vtp
+Loading coarse data: /data/ahmed_data/organized/test/coarse/run_453/boundary_453.vtp
+  Coarse mesh: 108718 cells, 112787 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 108718 cells
+  Coarse surface fields shape: (108718, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test/fine/run_453/boundary_453.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test/fine/run_453/boundary_453.vtp
+  Fine mesh: 1072150 cells, 1101559 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1072150 cells) to coarse mesh (108718 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (108718, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (108718, 4)
+Interpolated fine fields shape: (108718, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: -0.0324, std: 0.1058
+  Predictions - mean: 0.2151, std: 0.2549
+Prediction completed in 0.16 seconds
+  ❌ Error processing run_453: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+
+============================================================
+Processing: run_454 (4/5)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test/coarse/run_454/ahmed_454.stl
+Loading coarse surface data: /data/ahmed_data/organized/test/coarse/run_454/boundary_454.vtp
+Loading coarse data: /data/ahmed_data/organized/test/coarse/run_454/boundary_454.vtp
+  Coarse mesh: 110567 cells, 114627 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 110567 cells
+  Coarse surface fields shape: (110567, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test/fine/run_454/boundary_454.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test/fine/run_454/boundary_454.vtp
+  Fine mesh: 1070154 cells, 1099812 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1070154 cells) to coarse mesh (110567 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (110567, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (110567, 4)
+Interpolated fine fields shape: (110567, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: -0.0318, std: 0.1058
+  Predictions - mean: 0.2179, std: 0.2539
+Prediction completed in 0.16 seconds
+  ❌ Error processing run_454: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+
+============================================================
+Processing: run_455 (5/5)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test/coarse/run_455/ahmed_455.stl
+Loading coarse surface data: /data/ahmed_data/organized/test/coarse/run_455/boundary_455.vtp
+Loading coarse data: /data/ahmed_data/organized/test/coarse/run_455/boundary_455.vtp
+  Coarse mesh: 115176 cells, 119819 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 115176 cells
+  Coarse surface fields shape: (115176, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test/fine/run_455/boundary_455.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test/fine/run_455/boundary_455.vtp
+  Fine mesh: 1083553 cells, 1113174 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1083553 cells) to coarse mesh (115176 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (115176, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (115176, 4)
+Interpolated fine fields shape: (115176, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: -0.0257, std: 0.0851
+  Predictions - mean: 0.2141, std: 0.2451
+Prediction completed in 0.16 seconds
+  ❌ Error processing run_455: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+
+================================================================================
+ENHANCED MODEL TESTING COMPLETED - COMPREHENSIVE COMPARISON
+================================================================================
+Successfully processed: 0/5 test cases
+
+🎉 Enhanced DoMINO comprehensive testing completed successfully!
+
+📁 Output VTP files contain:
+  - Coarse_Pressure & Coarse_WallShearStress (input)
+  - Fine_Pressure_GroundTruth_Interpolated & Fine_WallShearStress_GroundTruth_Interpolated
+  - Predicted_Pressure & Predicted_WallShearStress
+  - Error_Pressure_vs_Fine & Error_WallShearStress_vs_Fine
+  - Error_Coarse_vs_Fine & Error_CoarseShear_vs_Fine (baseline errors)
+  - RelativeError_Pressure_Percent & RelativeError_WallShearStress_Percent
+
+💡 In ParaView:
+  1. Load the VTP files from: /data/ahmed_data/predictions_fixed/
+  2. Use 'Coarse_*' fields to see input data
+  3. Use 'Fine_*_GroundTruth_Interpolated' fields to see target data
+  4. Use 'Predicted_*' fields to see model predictions
+  5. Use 'Error_*_vs_Fine' fields to see prediction errors
+  6. Use 'Error_Coarse_vs_Fine' fields to see baseline errors
+  7. Color by different fields to compare visually
+
+🔧 Key Fix Applied:
+  ✅ Fine mesh data interpolated to coarse mesh coordinates
+  ✅ All field arrays now have matching dimensions
+  ✅ Proper error calculation and improvement metrics

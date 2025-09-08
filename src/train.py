@@ -372,12 +372,11 @@ def compute_loss_dict_enhanced(
         surface_normals = batch_inputs["surface_normals"]
         stream_velocity = batch_inputs["stream_velocity"]
         
-        if use_enhanced_features:
-            # Extract fine features as target (first 4 features)
-            surface_fields_all = batch_inputs["surface_fields"]
+        # Check if we're in enhanced mode by looking at the data shape
+        surface_fields_all = batch_inputs["surface_fields"]
+        if surface_fields_all.shape[-1] == 8:
+            # Enhanced mode: Extract fine features as target (first 4 features)
             target_surf = surface_fields_all[..., :4]  # Fine features only
-            
-            # Log coarse-to-fine improvement
             coarse_features = surface_fields_all[..., 4:8]
             
             # Calculate baseline error (using coarse as prediction)
@@ -386,8 +385,8 @@ def compute_loss_dict_enhanced(
             improvement = (baseline_error - prediction_error) / baseline_error
             loss_dict["improvement"] = improvement
         else:
-            # Standard training
-            target_surf = batch_inputs["surface_fields"]
+            # Standard training with 4 features
+            target_surf = surface_fields_all
         
         # Calculate losses
         loss_surf = loss_fn_surface(
@@ -505,7 +504,6 @@ def validation_step_enhanced(
                         integral_scaling_factor,
                         surf_loss_scaling,
                         vol_loss_scaling,
-                        use_enhanced_features=True,
                     )
                     if "improvement" in loss_dict:
                         running_improvement += loss_dict["improvement"].item()
@@ -529,72 +527,6 @@ def validation_step_enhanced(
         logger.info(f"Validation - Average improvement over coarse: {avg_improvement:.1%}")
 
     return avg_vloss
-
-def compute_loss_dict_enhanced(
-    prediction_vol, prediction_surf, batch_inputs, loss_fn_type,
-    integral_scaling_factor, surf_loss_scaling, vol_loss_scaling
-):
-    """Enhanced loss computation that properly handles 8-feature training data."""
-    total_loss_terms = []
-    loss_dict = {}
-    
-    if prediction_surf is not None:
-        # Extract fine features as target (first 4 features)
-        surface_fields_all = batch_inputs["surface_fields"]
-        if surface_fields_all.shape[-1] == 8:
-            target_surf = surface_fields_all[..., :4]  # Fine features only
-            coarse_features = surface_fields_all[..., 4:8]  # For baseline comparison
-            
-            # Calculate baseline error (coarse vs fine)
-            baseline_mse = torch.mean((coarse_features - target_surf) ** 2)
-            
-            # Calculate prediction error
-            prediction_mse = torch.mean((prediction_surf - target_surf) ** 2)
-            
-            # Improvement metric for monitoring
-            improvement = (baseline_mse - prediction_mse) / baseline_mse
-            loss_dict["improvement"] = improvement
-            loss_dict["baseline_mse"] = baseline_mse
-        else:
-            target_surf = surface_fields_all
-        
-        # Rest of surface loss calculation...
-        surface_areas = batch_inputs["surface_areas"]
-        surface_areas = torch.unsqueeze(surface_areas, -1)
-        surface_normals = batch_inputs["surface_normals"]
-        stream_velocity = batch_inputs["stream_velocity"]
-        
-        # Use existing loss functions with correct target
-        loss_surf = loss_fn_surface(prediction_surf, target_surf, loss_fn_type.loss_type)
-        loss_surf_area = loss_fn_area(
-            prediction_surf, target_surf, surface_normals, surface_areas,
-            area_scaling_factor=loss_fn_type.area_weighing_factor,
-            loss_type=loss_fn_type.loss_type
-        )
-        
-        # Apply scaling
-        if loss_fn_type.loss_type == "mse":
-            loss_surf = loss_surf * surf_loss_scaling
-            loss_surf_area = loss_surf_area * surf_loss_scaling
-            
-        total_loss_terms.append(0.5 * loss_surf)
-        loss_dict["loss_surf"] = 0.5 * loss_surf
-        total_loss_terms.append(0.5 * loss_surf_area)
-        loss_dict["loss_surf_area"] = 0.5 * loss_surf_area
-        
-        # Integral loss with correct target
-        loss_integral = integral_loss_fn(
-            prediction_surf, target_surf, surface_areas,
-            surface_normals, stream_velocity, padded_value=-10
-        ) * integral_scaling_factor
-        loss_dict["loss_integral"] = loss_integral
-        total_loss_terms.append(loss_integral)
-    
-    total_loss = sum(total_loss_terms)
-    loss_dict["total_loss"] = total_loss
-    
-    return total_loss, loss_dict
-
 
 @profile
 def train_epoch(
@@ -728,7 +660,6 @@ def train_epoch_enhanced(
                     integral_scaling_factor,
                     surf_loss_scaling,
                     vol_loss_scaling,
-                    use_enhanced_features=True,
                 )
                 
                 if "improvement" in loss_dict:

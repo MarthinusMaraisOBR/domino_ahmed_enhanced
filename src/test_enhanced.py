@@ -537,6 +537,7 @@ def main(cfg: DictConfig):
     )
     if os.path.exists(surf_save_path):
         surf_factors = np.load(surf_save_path).astype(np.float32)
+        print(f"Loaded surface scaling factors from {surf_save_path}")
         print(f"Loaded surface scaling factors: {surf_factors}")
     else:
         surf_factors = None
@@ -674,6 +675,15 @@ def main(cfg: DictConfig):
             surf_grid_norm = normalize(surf_grid, s_max, s_min).astype(np.float32)
             
             # Prepare data dictionary for model (ALL float32)
+            # Normalize coarse fields using inference scaling factors
+            if surf_factors is not None:
+                coarse_fields_normalized = (coarse_data['fields'] - surf_factors[1]) / (surf_factors[0] - surf_factors[1])
+                print(f"  DEBUG - Original coarse mean: {coarse_data["fields"].mean():.4f}, std: {coarse_data["fields"].std():.4f}")
+                print(f"  DEBUG - Normalized coarse mean: {coarse_fields_normalized.mean():.4f}, std: {coarse_fields_normalized.std():.4f}")
+                print(f"  DEBUG - Normalized range: [{coarse_fields_normalized.min():.4f}, {coarse_fields_normalized.max():.4f}]")
+            else:
+                coarse_fields_normalized = coarse_data['fields']
+            
             data_dict = {
                 "geometry_coordinates": stl_vertices,
                 "surf_grid": surf_grid_norm,
@@ -684,7 +694,7 @@ def main(cfg: DictConfig):
                 "surface_neighbors_normals": surface_neighbors_normals,
                 "surface_areas": coarse_data['areas'],
                 "surface_neighbors_areas": surface_neighbors_areas,
-                "surface_fields": coarse_data['fields'],  # Only coarse features!
+                "surface_fields": coarse_fields_normalized,  # Normalized coarse features
                 "pos_surface_center_of_mass": pos_surface_center_of_mass,
                 "surface_min_max": surf_grid_max_min,
                 "length_scale": np.array([length_scale], dtype=np.float32),
@@ -713,6 +723,9 @@ def main(cfg: DictConfig):
             
             if prediction_surf is not None:
                 prediction_surf = prediction_surf[0]  # Remove batch dimension
+                # Convert tensor to numpy for force calculations
+                if torch.is_tensor(prediction_surf):
+                    prediction_surf = prediction_surf.cpu().numpy()
                 
                 # Now all arrays have the same dimensions - calculate forces
                 surface_areas = coarse_data['areas'].reshape(-1, 1)

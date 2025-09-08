@@ -8,7 +8,7 @@ defaults:
 project:
   name: Ahmed_Dataset
 
-exp_tag: 11  # New experiment tag for fixed version
+exp_tag: "111"  # New experiment tag for fixed version
 
 # Main output directory
 project_dir: outputs/${project.name}/
@@ -175,7 +175,7 @@ model:
 
 # Training configuration
 train:
-  epochs: 50  # Reduced for faster iteration
+  epochs: 300  # Reduced for faster iteration
   checkpoint_interval: 25
   dataloader:
     batch_size: 1
@@ -199,7 +199,7 @@ eval:
   test_path: /data/ahmed_data/organized/test/fine/
   coarse_test_path: /data/ahmed_data/organized/test/coarse/
   save_path: /data/ahmed_data/predictions_fixed/
-  checkpoint_name: DoMINOEnhanced.best.pt
+  checkpoint_name: DoMINOEnhanced.0.49.pt
   scaling_param_path: outputs/Ahmed_Dataset/enhanced_fixed
   refine_stl: false
   stencil_size: 7

@@ -1,0 +1,196 @@
+/usr/local/lib/python3.12/dist-packages/physicsnemo/distributed/manager.py:415: UserWarning: Could not initialize using ENV, SLURM or OPENMPI methods. Assuming this is a single process job
+  warn(
+================================================================================
+ENHANCED DoMINO MODEL TESTING - MESH INTERPOLATION FIXED
+================================================================================
+Saving: Coarse + Fine (Interpolated) + Predicted + Error Fields
+Config summary:
+data:
+  bounding_box:
+    max:
+    - 6.0
+    - 1.0
+    - 1.4
+    min:
+    - -4.0
+    - -1.0
+    - 0.0
+  bounding_box_surface:
+    max:
+    - 1.0
+    - 0.4
+    - 0.5
+    min:
+    - -1.5
+    - -0.4
+    - 0.0
+  gpu_output: true
+  gpu_preprocessing: true
+  input_dir: /data/ahmed_data/processed/train/
+  input_dir_val: /data/ahmed_data/processed/val/
+data_processor:
+  cached_dir: /data/ahmed_data/ahmed_data/cached/
+  coarse_input_dir: /data/ahmed_data/organized/train/coarse/
+  input_dir: /data/ahmed_data/organized/train/fine/
+  kind: ahmed
+  num_processors: 8
+  output_dir: /data/ahmed_data/processed/train/
+  use_cache: false
+  use_enhanced_features: true
+domain_parallelism:
+  domain_size: 1
+  shard_grid: false
+  shard_points: false
+eval:
+  checkpoint_name: DoMINOEnhanced.0.49.pt
+  coarse_test_path: /data/ahmed_data/organized/test/coarse/
+  refine_stl: false
+  save_path: /data/ahmed_data/predictions_fixed/
+  scaling_param_path: outputs/Ahmed_Dataset/enhanced_fixed
+  stencil_size: 7
+  test_path: /data/ahmed_data/organized/test/fine/
+exp_tag: '11'
+model:
+  activation: relu
+  aggregation_model:
+    activation: ${model.activation}
+    base_layer: 512
+  encode_parameters: false
+  enhanced_model:
+    coarse_to_fine:
+      activation: ${model.activation}
+      dropout_rate: 0.1
+      hidden_layers:
+      - 256
+      - 256
+      use_residual: false
+      use_spectral: false
+    debug: true
+    surface_input_features: 8
+  geom_points_sample: 100000
+  geometry_encoding_type: both
+  geometry_local:
+    base_layer: 512
+    surface_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    surface_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+    volume_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    volume_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+  geometry_rep:
+    geo_conv:
+      activation: ${model.activation}
+      base_neurons: 32
+      base_neurons_out: 1
+      hops: 1
+      surface_radii:
+      - 0.01
+      - 0.05
+      - 0.1
+      volume_radii:
+      - 0.1
+      - 0.5
+      - 2.5
+      - 5.0
+    geo_processor:
+      activation: ${model.activation}
+      base_filters: 8
+    geo_processor_sdf:
+      base_filters: 8
+  integral_loss_scaling_factor: 100
+  interp_res:
+  - 128
+  - 64
+  - 64
+  local_point_conv:
+    activation: ${model.activation}
+  loss_function:
+    area_weighing_factor: 10000
+    loss_type: mse
+  model_type: surface
+  nn_basis_functions:
+    activation: ${model.activation}
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+  normalization: min_max_scaling
+  num_surface_neighbors: 7
+  parameter_model:
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+    scaling_params:
+    - 1.0
+    - 1.0
+  position_encoder:
+    base_neurons: 512
+  positional_encoding: false
+  resampling_surface_mesh:
+    points: 1000000
+    resample: false
+  solution_calculation_mode: two-loop
+  surf_loss_scaling: 1.0
+  surface_neighbors: true
+  surface_points_sample: 8192
+  surface_sampling_algorithm: area_weighted
+  use_sdf_in_basis_func: true
+  use_surface_area: true
+  use_surface_normals: true
+  vol_loss_scaling: 0.0
+  volume_points_sample: 0
+output: outputs/${project.name}/${exp_tag}
+project:
+  name: Ahmed_Dataset
+project_dir: outputs/${project.name}/
+resume_dir: ${output}/models
+train:
+  checkpoint_dir: null
+  checkpoint_interval: 25
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  epochs: 50
+  sampler:
+    drop_last: false
+    shuffle: true
+val:
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  sampler:
+    drop_last: false
+    shuffle: true
+variables:
+  surface:
+    enhanced_features:
+      coarse_variable_mapping:
+        pMean: p
+        wallShearStressMean: wallShearStress
+      input_feature_count: 8
+    solution:
+      pMean: scalar
+      wallShearStressMean: vector
+  volume:
+    solution:
+      UMeanTrim: vector
+      nutMeanTrim: scalar
+      pMeanTrim: scalar
+
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 539, in main
+    print(f"DEBUG: Loaded surf_factors shape: {surf_factors.shape}, values: {surf_factors}")
+                                               ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'surf_factors' where it is not associated with a value
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
