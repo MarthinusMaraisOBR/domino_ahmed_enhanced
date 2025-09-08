@@ -36,7 +36,7 @@ from torch.utils.data import Dataset
 from scipy.spatial import cKDTree
 from typing import Optional
 
-AIR_DENSITY = 1.205
+AIR_DENSITY = 1
 STREAM_VELOCITY = 1
 
 

@@ -34,31 +34,40 @@ def compute_enhanced_scaling_factors(data_dir, output_dir):
                 print(f"Warning: {npy_file.name} has {surface_fields.shape[1]} features, expected 8")
     
     # Create scaling factors array [2, 8]
-    # Row 0: max values, Row 1: min values
     scaling_factors = np.array([global_max, global_min], dtype=np.float32)
     
     print("\nScaling factors computed:")
     print("Feature | Min | Max")
     print("-" * 30)
     for i in range(8):
-        feature_name = f"Feature {i}"
-        if i < 4:
-            feature_name = f"Fine {i}"
-        else:
-            feature_name = f"Coarse {i-4}"
+        feature_name = f"Fine {i}" if i < 4 else f"Coarse {i-4}"
         print(f"{feature_name:10} | {global_min[i]:.6f} | {global_max[i]:.6f}")
     
     # Save scaling factors
     os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, "surface_scaling_factors_enhanced.npy")
-    np.save(save_path, scaling_factors)
-    print(f"\nSaved to: {save_path}")
     
-    # Also save inference factors (first 4 features only)
+    # Save 8-feature scaling factors
+    save_path = os.path.join(output_dir, "surface_scaling_factors.npy")
+    np.save(save_path, scaling_factors)
+    print(f"\nSaved 8-feature factors to: {save_path}")
+    
+    # Also save in the expected location for training
+    standard_path = "outputs/Ahmed_Dataset/enhanced_1/surface_scaling_factors.npy"
+    os.makedirs(os.path.dirname(standard_path), exist_ok=True)
+    np.save(standard_path, scaling_factors)
+    print(f"Also saved to: {standard_path}")
+    
+    # Save inference scaling factors (first 4 features only)
     inference_factors = scaling_factors[:, :4]
     inference_path = os.path.join(output_dir, "surface_scaling_factors_inference.npy")
     np.save(inference_path, inference_factors)
     print(f"Saved inference factors to: {inference_path}")
+    
+    # Also save in base directory for compatibility
+    base_path = "outputs/Ahmed_Dataset/surface_scaling_factors.npy"
+    os.makedirs(os.path.dirname(base_path), exist_ok=True)
+    np.save(base_path, inference_factors)
+    print(f"Saved base factors to: {base_path}")
     
     return scaling_factors
 
@@ -66,5 +75,4 @@ def compute_enhanced_scaling_factors(data_dir, output_dir):
 if __name__ == "__main__":
     data_dir = "/data/ahmed_data/processed/train/"
     output_dir = "outputs/Ahmed_Dataset/enhanced_1/"
-    
     scaling_factors = compute_enhanced_scaling_factors(data_dir, output_dir)

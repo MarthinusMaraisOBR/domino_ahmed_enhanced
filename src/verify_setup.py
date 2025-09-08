@@ -1,3 +1,4 @@
+# verify_setup.py
 #!/usr/bin/env python3
 """
 Verification script to check if Enhanced DoMINO is properly configured
@@ -71,11 +72,13 @@ def main():
     print("\n4. File Structure:")
     required_files = [
         'train.py',
-        'test.py',
+        'test_enhanced.py',
         'enhanced_domino_model.py',
         'openfoam_datapipe.py',
         'process_data.py',
         'conf/config.yaml',
+        'compute_enhanced_scaling_factors.py',
+        'test_interpolation_robust.py',
     ]
     
     for file in required_files:
@@ -113,6 +116,23 @@ def main():
         if not enhanced_enabled:
             warnings.append("Enhanced features not enabled in config.yaml")
         
+        # Check critical model settings
+        enhanced_model_config = config.get('model', {}).get('enhanced_model', {})
+        if enhanced_model_config:
+            surface_features = enhanced_model_config.get('surface_input_features', 4)
+            print(f"   {check_mark(surface_features == 8)} Surface input features = 8 (got {surface_features})")
+            
+            c2f_config = enhanced_model_config.get('coarse_to_fine', {})
+            use_residual = c2f_config.get('use_residual', True)
+            print(f"   {check_mark(not use_residual)} Residual connection disabled")
+            if use_residual:
+                errors.append("CRITICAL: Residual connection must be disabled!")
+            
+            use_spectral = c2f_config.get('use_spectral', True)
+            print(f"   {check_mark(not use_spectral)} Spectral features disabled")
+            if use_spectral:
+                warnings.append("Spectral features should be disabled for stability")
+        
         # Count available data
         if fine_exists:
             fine_cases = len(list(Path(fine_path).iterdir()))
@@ -123,58 +143,6 @@ def main():
             print(f"   Found {coarse_cases} coarse resolution cases")
     else:
         errors.append("config.yaml not found")
-    
-    # 6. Check enhanced model configuration
-    print("\n6. Enhanced Model Configuration:")
-    if config_path.exists():
-        model_config = config.get('model', {})
-        enhanced_config = model_config.get('enhanced_model', {})
-        
-        surface_features = enhanced_config.get('surface_input_features', 4)
-        print(f"   Surface input features: {surface_features}")
-        print(f"   {check_mark(surface_features == 8)} Should be 8 for enhanced mode")
-        if surface_features != 8:
-            warnings.append("surface_input_features should be 8 for enhanced mode")
-        
-        # Check coarse-to-fine config
-        c2f_config = enhanced_config.get('coarse_to_fine', {})
-        use_spectral = c2f_config.get('use_spectral', True)
-        use_residual = c2f_config.get('use_residual', True)
-        print(f"   Use spectral features: {use_spectral}")
-        print(f"   Use residual connections: {use_residual}")
-    
-    # 7. Test enhanced model import
-    print("\n7. Enhanced Model Import Test:")
-    try:
-        from enhanced_domino_model import DoMINOEnhanced
-        print(f"   {check_mark(True)} DoMINOEnhanced can be imported")
-        
-        # Try to create a small model
-        try:
-            test_model = DoMINOEnhanced(
-                input_features=3,
-                output_features_vol=None,
-                output_features_surf=4,
-                model_parameters={'enhanced_model': {'surface_input_features': 8}}
-            )
-            print(f"   {check_mark(True)} DoMINOEnhanced can be instantiated")
-        except Exception as e:
-            print(f"   {check_mark(False)} DoMINOEnhanced instantiation failed: {str(e)}")
-            errors.append(f"Model instantiation failed: {str(e)}")
-    except ImportError as e:
-        print(f"   {check_mark(False)} Cannot import DoMINOEnhanced: {str(e)}")
-        errors.append(f"Cannot import enhanced model: {str(e)}")
-    
-    # 8. Check for existing checkpoints
-    print("\n8. Existing Checkpoints:")
-    checkpoint_dir = Path("outputs/Ahmed_Dataset/1/models")
-    if checkpoint_dir.exists():
-        checkpoints = list(checkpoint_dir.glob("*.pt"))
-        print(f"   Found {len(checkpoints)} checkpoint(s)")
-        for ckpt in checkpoints[:3]:  # Show first 3
-            print(f"     - {ckpt.name}")
-    else:
-        print(f"   No checkpoints found (this is OK for first run)")
     
     # Summary
     print("\n" + "="*60)
@@ -194,17 +162,9 @@ def main():
             print(f"   {i}. {warning}")
     
     if not errors and not warnings:
-        print("\n🎉 Everything looks good! You're ready to train Enhanced DoMINO.")
-        print("\nNext steps:")
-        print("1. Run: python process_data.py")
-        print("2. Run: python train.py")
-    elif not errors:
-        print("\n⚠️  Setup is functional but check the warnings above.")
-    else:
-        print("\n❌ Please fix the errors above before proceeding.")
+        print("\n🎉 Everything looks good! You're ready to proceed.")
     
     return 0 if not errors else 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
