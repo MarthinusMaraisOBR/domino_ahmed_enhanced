@@ -54,16 +54,17 @@ def compute_enhanced_scaling_factors(data_dir, output_dir):
     np.save(save_path, scaling_factors)
     print(f"\nSaved to: {save_path}")
     
-    # Also save in the expected location for training
-    standard_path = "outputs/Ahmed_Dataset/enhanced_1/surface_scaling_factors.npy"
-    os.makedirs(os.path.dirname(standard_path), exist_ok=True)
-    np.save(standard_path, scaling_factors)
-    print(f"Also saved to: {standard_path}")
+    # Also save inference factors (first 4 features only)
+    inference_factors = scaling_factors[:, :4]
+    inference_path = os.path.join(output_dir, "surface_scaling_factors_inference.npy")
+    np.save(inference_path, inference_factors)
+    print(f"Saved inference factors to: {inference_path}")
     
     return scaling_factors
 
 # Run computation
-data_dir = "/data/ahmed_data/processed/train/"
-output_dir = "outputs/Ahmed_Dataset/enhanced_1/"
-
-scaling_factors = compute_enhanced_scaling_factors(data_dir, output_dir)
+if __name__ == "__main__":
+    data_dir = "/data/ahmed_data/processed/train/"
+    output_dir = "outputs/Ahmed_Dataset/enhanced_1/"
+    
+    scaling_factors = compute_enhanced_scaling_factors(data_dir, output_dir)
