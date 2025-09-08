@@ -8,7 +8,7 @@ defaults:
 project:
   name: Ahmed_Dataset
 
-exp_tag: enhanced_fixed  # New experiment tag for fixed version
+exp_tag: 11  # New experiment tag for fixed version
 
 # Main output directory
 project_dir: outputs/${project.name}/
@@ -175,7 +175,7 @@ model:
 
 # Training configuration
 train:
-  epochs: 300  # Reduced for faster iteration
+  epochs: 50  # Reduced for faster iteration
   checkpoint_interval: 25
   dataloader:
     batch_size: 1
