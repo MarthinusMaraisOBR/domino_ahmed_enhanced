@@ -1,0 +1,4 @@
+  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 696
+    else:
+    ^^^^
+SyntaxError: invalid syntax

@@ -1,205 +1,186 @@
-# Complete configuration for Enhanced DoMINO with all fixes
-# Save this as conf/config_enhanced_fixed.yaml
-
-defaults:
-  - _self_
-
-# Project configuration
-project:
-  name: Ahmed_Dataset
-
-exp_tag: "111"  # New experiment tag for fixed version
-
-# Main output directory
-project_dir: outputs/${project.name}/
-output: outputs/${project.name}/${exp_tag}
-
-hydra:
-  run:
-    dir: ${output}
-  output_subdir: hydra
-
-# Resume directory for checkpoints
-resume_dir: ${output}/models
-
-# Data preprocessing configuration
-data_processor:
-  kind: ahmed
-  output_dir: /data/ahmed_data/processed/train/
-  input_dir: /data/ahmed_data/organized/train/fine/
-  cached_dir: /data/ahmed_data/ahmed_data/cached/
-  use_cache: false
-  num_processors: 8
-
-  # Enhanced features configuration
-  use_enhanced_features: true
-  coarse_input_dir: /data/ahmed_data/organized/train/coarse/
-
-# Solution variables
-variables:
-  surface:
-    solution:
-      pMean: scalar
-      wallShearStressMean: vector
-
-    # Enhanced features configuration
-    enhanced_features:
-      input_feature_count: 8  # 4 fine + 4 coarse interpolated features
-      coarse_variable_mapping:
-        pMean: p
-        wallShearStressMean: wallShearStress
-
-  # Volume variables (even if not used, needed for config)
-  volume:
-    solution:
-      UMeanTrim: vector
-      pMeanTrim: scalar
-      nutMeanTrim: scalar
-
-# Training data configuration
 data:
+  bounding_box:
+    max:
+    - 6.0
+    - 1.0
+    - 1.4
+    min:
+    - -4.0
+    - -1.0
+    - 0.0
+  bounding_box_surface:
+    max:
+    - 1.0
+    - 0.4
+    - 0.5
+    min:
+    - -1.5
+    - -0.4
+    - 0.0
+  gpu_output: true
+  gpu_preprocessing: true
   input_dir: /data/ahmed_data/processed/train/
   input_dir_val: /data/ahmed_data/processed/val/
-
-  # Bounding boxes based on Ahmed geometry
-  bounding_box:
-    min: [-4.0, -1.0, 0.0]
-    max: [6.0, 1.0, 1.4]
-
-  bounding_box_surface:
-    min: [-1.5, -0.4, 0.0]
-    max: [1.0, 0.4, 0.5]
-
-  gpu_preprocessing: true
-  gpu_output: true
-
-# Domain parallelism settings
+data_processor:
+  cached_dir: /data/ahmed_data/ahmed_data/cached/
+  coarse_input_dir: /data/ahmed_data/organized/train/coarse/
+  input_dir: /data/ahmed_data/organized/train/fine/
+  kind: ahmed
+  num_processors: 8
+  output_dir: /data/ahmed_data/processed/train/
+  use_cache: false
+  use_enhanced_features: true
+defaults:
+- _self_
 domain_parallelism:
   domain_size: 1
   shard_grid: false
   shard_points: false
-
-# Model configuration with FIXES
+eval:
+  checkpoint_name: DoMINOEnhanced.0.299.pt
+  coarse_test_path: /data/ahmed_data/organized/test/coarse/
+  refine_stl: false
+  save_path: /data/ahmed_data/predictions_fixed/
+  scaling_param_path: outputs/Ahmed_Dataset
+  stencil_size: 7
+  test_path: /data/ahmed_data/organized/test/fine/
+exp_tag: '111'
+hydra:
+  output_subdir: hydra
+  run:
+    dir: ${output}
 model:
-  model_type: surface
-  activation: "relu"
-
-  loss_function:
-    loss_type: "mse"
-    area_weighing_factor: 10000
-
-  interp_res: [128, 64, 64]
-  use_sdf_in_basis_func: true
-  positional_encoding: false
-
-  # Sampling parameters
-  volume_points_sample: 0  # Surface only
-  surface_points_sample: 8192
-  geom_points_sample: 100_000
-  surface_sampling_algorithm: area_weighted
-  surface_neighbors: true
-  num_surface_neighbors: 7
-  use_surface_normals: true
-  use_surface_area: true
-  integral_loss_scaling_factor: 100
-  normalization: min_max_scaling
+  activation: relu
+  aggregation_model:
+    activation: ${model.activation}
+    base_layer: 512
   encode_parameters: false
-
-  # Loss scaling
-  surf_loss_scaling: 1.0  # Reduced from 5.0
-  vol_loss_scaling: 0.0   # Surface only
-
+  enhanced_model:
+    coarse_to_fine:
+      activation: ${model.activation}
+      dropout_rate: 0.1
+      hidden_layers:
+      - 256
+      - 256
+      use_residual: false
+      use_spectral: false
+    debug: true
+    surface_input_features: 8
+  geom_points_sample: 100000
   geometry_encoding_type: both
-  solution_calculation_mode: two-loop
-
-  resampling_surface_mesh:
-    resample: false
-    points: 1_000_000
-
-  # Geometry representation hyperparameters
+  geometry_local:
+    base_layer: 512
+    surface_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    surface_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+    volume_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    volume_radii:
+    - 0.05
+    - 0.25
+    - 1.0
   geometry_rep:
     geo_conv:
+      activation: ${model.activation}
       base_neurons: 32
       base_neurons_out: 1
-      volume_radii: [0.1, 0.5, 2.5, 5.0]
-      surface_radii: [0.01, 0.05, 0.1]
       hops: 1
-      activation: ${model.activation}
+      surface_radii:
+      - 0.01
+      - 0.05
+      - 0.1
+      volume_radii:
+      - 0.1
+      - 0.5
+      - 2.5
+      - 5.0
     geo_processor:
-      base_filters: 8
       activation: ${model.activation}
+      base_filters: 8
     geo_processor_sdf:
       base_filters: 8
-
-  nn_basis_functions:
-    base_layer: 512
-    fourier_features: false
-    num_modes: 5
-    activation: ${model.activation}
-
+  integral_loss_scaling_factor: 100
+  interp_res:
+  - 128
+  - 64
+  - 64
   local_point_conv:
     activation: ${model.activation}
-
-  aggregation_model:
-    base_layer: 512
+  loss_function:
+    area_weighing_factor: 10000
+    loss_type: mse
+  model_type: surface
+  nn_basis_functions:
     activation: ${model.activation}
-
-  position_encoder:
-    base_neurons: 512
-
-  geometry_local:
-    volume_neighbors_in_radius: [64, 128, 256]
-    surface_neighbors_in_radius: [64, 128, 256]
-    volume_radii: [0.05, 0.25, 1.0]
-    surface_radii: [0.05, 0.25, 1.0]
     base_layer: 512
-
-  # CRITICAL: Parameter model configuration (was missing)
-  parameter_model:
-    base_layer: 512
-    scaling_params: [1.0, 1.0]  # Standard normalization
     fourier_features: false
     num_modes: 5
-  # FIXED Enhanced model configuration
-  enhanced_model:
-    surface_input_features: 8
-    debug: true  # Enable debug logging
-
-    coarse_to_fine:
-      # SIMPLIFIED AND FIXED
-      hidden_layers: [256, 256]  # Reduced complexity
-      use_spectral: false        # DISABLED - was causing issues
-      use_residual: false        # CRITICAL: DISABLED - main problem!
-      dropout_rate: 0.1          # Added regularization
-      activation: ${model.activation}
-
-# Training configuration
+  normalization: min_max_scaling
+  num_surface_neighbors: 7
+  parameter_model:
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+    scaling_params:
+    - 1.0
+    - 1.0
+  position_encoder:
+    base_neurons: 512
+  positional_encoding: false
+  resampling_surface_mesh:
+    points: 1000000
+    resample: false
+  solution_calculation_mode: two-loop
+  surf_loss_scaling: 1.0
+  surface_neighbors: true
+  surface_points_sample: 8192
+  surface_sampling_algorithm: area_weighted
+  use_sdf_in_basis_func: true
+  use_surface_area: true
+  use_surface_normals: true
+  vol_loss_scaling: 0.0
+  volume_points_sample: 0
+output: outputs/${project.name}/${exp_tag}
+project:
+  name: Ahmed_Dataset
+project_dir: outputs/${project.name}/
+resume_dir: ${output}/models
 train:
-  epochs: 300  # Reduced for faster iteration
+  checkpoint_dir: null
   checkpoint_interval: 25
   dataloader:
     batch_size: 1
     pin_memory: false
+  epochs: 300
   sampler:
-    shuffle: true
     drop_last: false
-  checkpoint_dir: null  # Start fresh
-
-# Validation configuration
+    shuffle: true
 val:
   dataloader:
     batch_size: 1
     pin_memory: false
   sampler:
-    shuffle: true
     drop_last: false
-
-# Testing/evaluation configuration
-eval:
-  test_path: /data/ahmed_data/organized/test/fine/
-  coarse_test_path: /data/ahmed_data/organized/test/coarse/
-  save_path: /data/ahmed_data/predictions_fixed/
-  checkpoint_name: DoMINOEnhanced.0.49.pt
-  scaling_param_path: outputs/Ahmed_Dataset/enhanced_fixed
-  refine_stl: false
-  stencil_size: 7
+    shuffle: true
+variables:
+  surface:
+    enhanced_features:
+      coarse_variable_mapping:
+        pMean: p
+        wallShearStressMean: wallShearStress
+      input_feature_count: 8
+    solution:
+      pMean: scalar
+      wallShearStressMean: vector
+  volume:
+    solution:
+      UMeanTrim: vector
+      nutMeanTrim: scalar
+      pMeanTrim: scalar

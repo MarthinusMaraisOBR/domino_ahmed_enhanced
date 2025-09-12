@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: Copyright (c) 2023 - 2024 NVIDIA CORPORATION & AFFILIATES.
-# SPDX-License-Identifier: Apache-2.0
+from physicsnemo.utils.domino.utils import (
+    normalize, unnormalize, calculate_center_of_mass,
+    create_grid, write_to_vtp
+)
 
 """
 FIXED Enhanced DoMINO model testing with mesh interpolation.
@@ -33,7 +35,6 @@ import pyvista as pv
 from scipy.spatial import cKDTree
 
 from physicsnemo.distributed import DistributedManager
-from physicsnemo.utils.domino.utils import *
 from physicsnemo.utils.sdf import signed_distance_field
 
 # Import the enhanced model
@@ -330,6 +331,7 @@ def load_fine_vtp_data_and_interpolate(vtp_path, surface_variables, target_coord
 def test_enhanced_model(data_dict, model, device, cfg, surf_factors):
     """
     Test the enhanced model with STRICT float32 type enforcement.
+    Handles both 4-feature and 8-feature scaling factors properly.
     """
     
     with torch.no_grad():
@@ -354,24 +356,28 @@ def test_enhanced_model(data_dict, model, device, cfg, surf_factors):
         _, prediction_surf = model(data_dict_gpu)
         
         if prediction_surf is not None and surf_factors is not None:
+            # Get the number of features in predictions
+            n_features = prediction_surf.shape[-1]
+            
+            # Handle scaling factors properly
+            if surf_factors.shape[1] > n_features:
+                # If scaling factors have more columns than features, use only first n_features columns
+                surf_max = surf_factors[0, :n_features]
+                surf_min = surf_factors[1, :n_features]
+            else:
+                # Use all columns
+                surf_max = surf_factors[0]
+                surf_min = surf_factors[1]
+            
             # Unnormalize predictions
             prediction_surf = unnormalize(
                 prediction_surf.cpu().numpy(),
-                surf_factors[0],
-                surf_factors[1]
+                surf_max,
+                surf_min
             )
             
-            # Scale by physical parameters
-            stream_velocity = data_dict_gpu["stream_velocity"][0, 0].cpu().numpy()
-            air_density = data_dict_gpu["air_density"][0, 0].cpu().numpy()
-            
-            prediction_surf = (
-                prediction_surf * stream_velocity**2.0 * air_density
-            )
-    
     return prediction_surf
-
-
+            
 def save_comprehensive_vtp(
     output_path: str,
     base_mesh: pv.PolyData,
@@ -676,14 +682,18 @@ def main(cfg: DictConfig):
             
             # Prepare data dictionary for model (ALL float32)
             # Normalize coarse fields using inference scaling factors
-            if surf_factors is not None:
-                coarse_fields_normalized = (coarse_data['fields'] - surf_factors[1]) / (surf_factors[0] - surf_factors[1])
+            # Handle scaling factors with different shapes
+            n_features = coarse_data["fields"].shape[-1]
+            if surf_factors.shape[1] > n_features:
+                # Use only the columns matching the data features
+                coarse_fields_normalized = normalize(coarse_data["fields"], surf_factors[0, :n_features], surf_factors[1, :n_features])
+            else:
+                coarse_fields_normalized = normalize(coarse_data["fields"], surf_factors[0], surf_factors[1])
+
                 print(f"  DEBUG - Original coarse mean: {coarse_data["fields"].mean():.4f}, std: {coarse_data["fields"].std():.4f}")
                 print(f"  DEBUG - Normalized coarse mean: {coarse_fields_normalized.mean():.4f}, std: {coarse_fields_normalized.std():.4f}")
-                print(f"  DEBUG - Normalized range: [{coarse_fields_normalized.min():.4f}, {coarse_fields_normalized.max():.4f}]")
-            else:
-                coarse_fields_normalized = coarse_data['fields']
-            
+                coarse_fields_normalized = coarse_data["fields"]
+                
             data_dict = {
                 "geometry_coordinates": stl_vertices,
                 "surf_grid": surf_grid_norm,
@@ -723,6 +733,8 @@ def main(cfg: DictConfig):
             
             if prediction_surf is not None:
                 prediction_surf = prediction_surf[0]  # Remove batch dimension
+                print(f"After removing batch dim: shape={prediction_surf.shape}, type={type(prediction_surf)}")
+                print(f"Prediction stats: mean={prediction_surf.mean():.6f}, min={prediction_surf.min():.6f}, max={prediction_surf.max():.6f}")
                 # Convert tensor to numpy for force calculations
                 if torch.is_tensor(prediction_surf):
                     prediction_surf = prediction_surf.cpu().numpy()

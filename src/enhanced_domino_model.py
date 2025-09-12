@@ -17,7 +17,7 @@ from typing import Dict, Optional, Tuple
 from omegaconf import DictConfig
 
 from physicsnemo.models.domino.model import DoMINO
-from physicsnemo.models.layers.weight_norm import WeightNormLinear
+
 
 
 class FullyConnected(nn.Module):
@@ -38,7 +38,7 @@ class FullyConnected(nn.Module):
         
         # Input layer
         layers.append(nn.Linear(in_features, layer_size))
-        layers.append(nn.LayerNorm(layer_size))
+        # layers.append(nn.LayerNorm(layer_size))  # Removed
         if activation == "relu":
             layers.append(nn.ReLU())
         elif activation == "gelu":
@@ -51,7 +51,7 @@ class FullyConnected(nn.Module):
         # Hidden layers
         for _ in range(num_layers - 2):
             layers.append(nn.Linear(layer_size, layer_size))
-            layers.append(nn.LayerNorm(layer_size))
+            # layers.append(nn.LayerNorm(layer_size))  # Removed
             if activation == "relu":
                 layers.append(nn.ReLU())
             elif activation == "gelu":
@@ -175,8 +175,8 @@ class CoarseToFineModel(nn.Module):
         in_features = fusion_input_dim
         
         for i, hidden_dim in enumerate(hidden_layers):
-            layers.append(WeightNormLinear(in_features, hidden_dim))
-            layers.append(nn.LayerNorm(hidden_dim))
+            layers.append(nn.Linear(in_features, hidden_dim))
+            # layers.append(nn.LayerNorm(hidden_dim))  # Removed - was constraining output
             
             if activation == "relu":
                 layers.append(nn.ReLU())
@@ -212,7 +212,7 @@ class CoarseToFineModel(nn.Module):
     def _initialize_weights(self):
         """Initialize weights for better training."""
         for module in self.modules():
-            if isinstance(module, (nn.Linear, WeightNormLinear)):
+            if isinstance(module, (nn.Linear, nn.Linear)):
                 if hasattr(module, 'weight_v'):
                     nn.init.xavier_uniform_(module.weight_v, gain=0.5)
                 elif hasattr(module, 'weight'):

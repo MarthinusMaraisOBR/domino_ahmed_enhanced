@@ -1,3 +1,0 @@
-  File "/workspace/PhysicsNeMo/examples/cfd/external_aerodynamics/domino/src/test_enhanced.py", line 2
-    if surf_factors is not None:
-IndentationError: unexpected indent
