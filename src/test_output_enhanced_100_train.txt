@@ -1,0 +1,4555 @@
+/usr/local/lib/python3.12/dist-packages/physicsnemo/distributed/manager.py:415: UserWarning: Could not initialize using ENV, SLURM or OPENMPI methods. Assuming this is a single process job
+  warn(
+================================================================================
+ENHANCED DoMINO MODEL TESTING - MESH INTERPOLATION FIXED
+================================================================================
+Saving: Coarse + Fine (Interpolated) + Predicted + Error Fields
+Config summary:
+data:
+  bounding_box:
+    max:
+    - 6.0
+    - 1.0
+    - 1.4
+    min:
+    - -4.0
+    - -1.0
+    - 0.0
+  bounding_box_surface:
+    max:
+    - 1.0
+    - 0.4
+    - 0.5
+    min:
+    - -1.5
+    - -0.4
+    - 0.0
+  gpu_output: true
+  gpu_preprocessing: true
+  input_dir: /data/ahmed_data/processed/train/
+  input_dir_val: /data/ahmed_data/processed/val/
+data_processor:
+  cached_dir: /data/ahmed_data/ahmed_data/cached/
+  coarse_input_dir: /data/ahmed_data/organized/train/coarse/
+  input_dir: /data/ahmed_data/organized/train/fine/
+  kind: ahmed
+  num_processors: 8
+  output_dir: /data/ahmed_data/processed/train/
+  use_cache: false
+  use_enhanced_features: true
+domain_parallelism:
+  domain_size: 1
+  shard_grid: false
+  shard_points: false
+eval:
+  checkpoint_name: Enhanced_epoch_100.pt
+  coarse_test_path: /data/ahmed_data/organized/test_on_train/coarse/
+  refine_stl: false
+  save_path: /data/ahmed_data/predictions_fixed/train_50
+  scaling_param_path: outputs/Ahmed_Dataset
+  stencil_size: 7
+  test_path: /data/ahmed_data/organized/test_on_train/fine/
+exp_tag: '111'
+model:
+  activation: relu
+  aggregation_model:
+    activation: ${model.activation}
+    base_layer: 512
+  encode_parameters: false
+  enhanced_model:
+    coarse_to_fine:
+      activation: ${model.activation}
+      dropout_rate: 0.1
+      hidden_layers:
+      - 256
+      - 256
+      use_residual: false
+      use_spectral: false
+    debug: true
+    surface_input_features: 8
+  geom_points_sample: 100000
+  geometry_encoding_type: both
+  geometry_local:
+    base_layer: 512
+    surface_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    surface_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+    volume_neighbors_in_radius:
+    - 64
+    - 128
+    - 256
+    volume_radii:
+    - 0.05
+    - 0.25
+    - 1.0
+  geometry_rep:
+    geo_conv:
+      activation: ${model.activation}
+      base_neurons: 32
+      base_neurons_out: 1
+      hops: 1
+      surface_radii:
+      - 0.01
+      - 0.05
+      - 0.1
+      volume_radii:
+      - 0.1
+      - 0.5
+      - 2.5
+      - 5.0
+    geo_processor:
+      activation: ${model.activation}
+      base_filters: 8
+    geo_processor_sdf:
+      base_filters: 8
+  integral_loss_scaling_factor: 100
+  interp_res:
+  - 128
+  - 64
+  - 64
+  local_point_conv:
+    activation: ${model.activation}
+  loss_function:
+    area_weighing_factor: 10000
+    loss_type: mse
+  model_type: surface
+  nn_basis_functions:
+    activation: ${model.activation}
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+  normalization: min_max_scaling
+  num_surface_neighbors: 7
+  parameter_model:
+    base_layer: 512
+    fourier_features: false
+    num_modes: 5
+    scaling_params:
+    - 1.0
+    - 1.0
+  position_encoder:
+    base_neurons: 512
+  positional_encoding: false
+  resampling_surface_mesh:
+    points: 1000000
+    resample: false
+  solution_calculation_mode: two-loop
+  surf_loss_scaling: 1.0
+  surface_neighbors: true
+  surface_points_sample: 8192
+  surface_sampling_algorithm: area_weighted
+  use_sdf_in_basis_func: true
+  use_surface_area: true
+  use_surface_normals: true
+  vol_loss_scaling: 0.0
+  volume_points_sample: 0
+output: outputs/${project.name}/${exp_tag}
+project:
+  name: Ahmed_Dataset
+project_dir: outputs/${project.name}/
+resume_dir: ${output}/models
+train:
+  checkpoint_dir: outputs/Ahmed_Dataset/111/models
+  checkpoint_interval: 25
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  epochs: 1000
+  sampler:
+    drop_last: false
+    shuffle: true
+val:
+  dataloader:
+    batch_size: 1
+    pin_memory: false
+  sampler:
+    drop_last: false
+    shuffle: true
+variables:
+  surface:
+    enhanced_features:
+      coarse_variable_mapping:
+        pMean: p
+        wallShearStressMean: wallShearStress
+      input_feature_count: 8
+    solution:
+      pMean: scalar
+      wallShearStressMean: vector
+  volume:
+    solution:
+      UMeanTrim: vector
+      nutMeanTrim: scalar
+      pMeanTrim: scalar
+
+Loaded surface scaling factors from outputs/Ahmed_Dataset/surface_scaling_factors_inference.npy
+Loaded surface scaling factors: [[ 0.525633    0.0052116   0.0237959   0.00646359  0.5229461   0.00398202
+   0.01039431  0.00466049]
+ [-2.1417472  -0.04687034 -0.02374272 -0.0222362  -2.1378136  -0.02250537
+  -0.01041671 -0.01651339]]
+
+Creating Enhanced DoMINO model...
+
+============================================================
+Initializing DoMINOEnhanced for coarse-to-fine prediction
+============================================================
+[CoarseToFineModel] Initializing with:
+  - Input dim: 4
+  - Output dim: 4
+  - Encoding dim: 448
+  - Hidden layers: [256, 256]
+  - Use spectral: False
+  - Use residual: False ⚠️ DISABLED - was causing issues
+
+DoMINOEnhanced initialized:
+  - Input: 4 coarse features + 448D geometry
+  - Output: 4 fine features
+  - Debug mode: True
+============================================================
+
+Loading checkpoint: outputs/Ahmed_Dataset/111/models/Enhanced_epoch_100.pt
+Model loaded successfully with float32 parameters
+
+Processing 50 test cases
+
+============================================================
+Processing: run_1 (1/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_1/ahmed_1.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_1/boundary_1.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_1/boundary_1.vtp
+  Coarse mesh: 111807 cells, 115874 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 111807 cells
+  Coarse surface fields shape: (111807, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_1/boundary_1.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_1/boundary_1.vtp
+  Fine mesh: 1101574 cells, 1131049 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1101574 cells) to coarse mesh (111807 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (111807, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (111807, 4)
+Interpolated fine fields shape: (111807, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4584, std: 0.2832
+  Predictions - mean: 0.4618, std: 0.2902
+Prediction completed in 0.45 seconds
+After removing batch dim: shape=(111807, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.025188, min=-0.824998, max=0.486942
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.012532 N
+    Fine (Interp): 0.013345 N
+    Predicted:    0.014042 N
+    Coarse vs Fine error: 0.000813 N
+    Pred vs Fine error:   0.000697 N
+    Improvement: 14.3%
+  Lift Forces:
+    Coarse:       -0.005954 N
+    Fine (Interp): -0.005284 N
+    Predicted:    -0.001364 N
+    Coarse vs Fine error: 0.000670 N
+    Pred vs Fine error:   0.003920 N
+    Improvement: -484.7%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_1_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_1_comprehensive_comparison.vtp
+  All field arrays have 111807 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.010960
+    Predicted:       0.030186
+    Improvement:     -175.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000300
+    Predicted:       0.000678
+    Improvement:     -126.0%
+
+============================================================
+Processing: run_10 (2/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_10/ahmed_10.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_10/boundary_10.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_10/boundary_10.vtp
+  Coarse mesh: 85155 cells, 88710 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 85155 cells
+  Coarse surface fields shape: (85155, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_10/boundary_10.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_10/boundary_10.vtp
+  Fine mesh: 813548 cells, 836180 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (813548 cells) to coarse mesh (85155 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (85155, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (85155, 4)
+Interpolated fine fields shape: (85155, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4535, std: 0.2823
+  Predictions - mean: 0.4595, std: 0.2893
+Prediction completed in 0.14 seconds
+After removing batch dim: shape=(85155, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.026326, min=-0.747936, max=0.480231
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.011677 N
+    Fine (Interp): 0.010558 N
+    Predicted:    0.011186 N
+    Coarse vs Fine error: 0.001118 N
+    Pred vs Fine error:   0.000627 N
+    Improvement: 43.9%
+  Lift Forces:
+    Coarse:       0.009211 N
+    Fine (Interp): 0.008197 N
+    Predicted:    0.006852 N
+    Coarse vs Fine error: 0.001014 N
+    Pred vs Fine error:   0.001345 N
+    Improvement: -32.7%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_10_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_10_comprehensive_comparison.vtp
+  All field arrays have 85155 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.016009
+    Predicted:       0.026776
+    Improvement:     -67.3%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000329
+    Predicted:       0.000660
+    Improvement:     -100.4%
+
+============================================================
+Processing: run_11 (3/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_11/ahmed_11.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_11/boundary_11.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_11/boundary_11.vtp
+  Coarse mesh: 98161 cells, 102072 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 98161 cells
+  Coarse surface fields shape: (98161, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_11/boundary_11.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_11/boundary_11.vtp
+  Fine mesh: 995780 cells, 1023210 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (995780 cells) to coarse mesh (98161 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (98161, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (98161, 4)
+Interpolated fine fields shape: (98161, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4518, std: 0.2850
+  Predictions - mean: 0.4567, std: 0.2914
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(98161, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.030135, min=-0.818434, max=0.481961
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.016981 N
+    Fine (Interp): 0.018360 N
+    Predicted:    0.018831 N
+    Coarse vs Fine error: 0.001379 N
+    Pred vs Fine error:   0.000472 N
+    Improvement: 65.8%
+  Lift Forces:
+    Coarse:       -0.007957 N
+    Fine (Interp): -0.006651 N
+    Predicted:    -0.002890 N
+    Coarse vs Fine error: 0.001306 N
+    Pred vs Fine error:   0.003761 N
+    Improvement: -187.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_11_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_11_comprehensive_comparison.vtp
+  All field arrays have 98161 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.011745
+    Predicted:       0.026475
+    Improvement:     -125.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000308
+    Predicted:       0.000652
+    Improvement:     -112.1%
+
+============================================================
+Processing: run_12 (4/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_12/ahmed_12.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_12/boundary_12.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_12/boundary_12.vtp
+  Coarse mesh: 124634 cells, 128975 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 124634 cells
+  Coarse surface fields shape: (124634, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_12/boundary_12.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_12/boundary_12.vtp
+  Fine mesh: 1173077 cells, 1204436 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1173077 cells) to coarse mesh (124634 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (124634, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (124634, 4)
+Interpolated fine fields shape: (124634, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4538, std: 0.2834
+  Predictions - mean: 0.4559, std: 0.2921
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(124634, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.032554, min=-1.050018, max=0.479755
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.019037 N
+    Fine (Interp): 0.021419 N
+    Predicted:    0.020411 N
+    Coarse vs Fine error: 0.002381 N
+    Pred vs Fine error:   0.001007 N
+    Improvement: 57.7%
+  Lift Forces:
+    Coarse:       0.007781 N
+    Fine (Interp): 0.022281 N
+    Predicted:    0.017994 N
+    Coarse vs Fine error: 0.014500 N
+    Pred vs Fine error:   0.004287 N
+    Improvement: 70.4%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_12_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_12_comprehensive_comparison.vtp
+  All field arrays have 124634 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.071407
+    Predicted:       0.051255
+    Improvement:     28.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000446
+    Predicted:       0.000696
+    Improvement:     -56.2%
+
+============================================================
+Processing: run_13 (5/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_13/ahmed_13.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_13/boundary_13.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_13/boundary_13.vtp
+  Coarse mesh: 101983 cells, 105996 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 101983 cells
+  Coarse surface fields shape: (101983, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_13/boundary_13.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_13/boundary_13.vtp
+  Fine mesh: 945332 cells, 971543 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (945332 cells) to coarse mesh (101983 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (101983, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (101983, 4)
+Interpolated fine fields shape: (101983, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4464, std: 0.2851
+  Predictions - mean: 0.4498, std: 0.2930
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(101983, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.037837, min=-1.547239, max=0.480868
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.022250 N
+    Fine (Interp): 0.020044 N
+    Predicted:    0.020186 N
+    Coarse vs Fine error: 0.002207 N
+    Pred vs Fine error:   0.000142 N
+    Improvement: 93.6%
+  Lift Forces:
+    Coarse:       0.018448 N
+    Fine (Interp): 0.023413 N
+    Predicted:    0.020784 N
+    Coarse vs Fine error: 0.004965 N
+    Pred vs Fine error:   0.002629 N
+    Improvement: 47.1%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_13_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_13_comprehensive_comparison.vtp
+  All field arrays have 101983 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.070636
+    Predicted:       0.062338
+    Improvement:     11.7%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000574
+    Predicted:       0.000693
+    Improvement:     -20.7%
+
+============================================================
+Processing: run_14 (6/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_14/ahmed_14.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_14/boundary_14.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_14/boundary_14.vtp
+  Coarse mesh: 112286 cells, 116752 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 112286 cells
+  Coarse surface fields shape: (112286, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_14/boundary_14.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_14/boundary_14.vtp
+  Fine mesh: 999443 cells, 1026706 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (999443 cells) to coarse mesh (112286 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (112286, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (112286, 4)
+Interpolated fine fields shape: (112286, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4531, std: 0.2829
+  Predictions - mean: 0.4571, std: 0.2911
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(112286, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.030386, min=-1.000860, max=0.482175
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.018939 N
+    Fine (Interp): 0.019751 N
+    Predicted:    0.018961 N
+    Coarse vs Fine error: 0.000812 N
+    Pred vs Fine error:   0.000790 N
+    Improvement: 2.7%
+  Lift Forces:
+    Coarse:       0.017793 N
+    Fine (Interp): 0.026128 N
+    Predicted:    0.020661 N
+    Coarse vs Fine error: 0.008335 N
+    Pred vs Fine error:   0.005467 N
+    Improvement: 34.4%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_14_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_14_comprehensive_comparison.vtp
+  All field arrays have 112286 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.052019
+    Predicted:       0.046320
+    Improvement:     11.0%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000395
+    Predicted:       0.000690
+    Improvement:     -74.5%
+
+============================================================
+Processing: run_15 (7/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_15/ahmed_15.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_15/boundary_15.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_15/boundary_15.vtp
+  Coarse mesh: 129742 cells, 133991 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 129742 cells
+  Coarse surface fields shape: (129742, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_15/boundary_15.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_15/boundary_15.vtp
+  Fine mesh: 1251630 cells, 1284274 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1251630 cells) to coarse mesh (129742 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (129742, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (129742, 4)
+Interpolated fine fields shape: (129742, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4549, std: 0.2838
+  Predictions - mean: 0.4591, std: 0.2905
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(129742, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028201, min=-0.941750, max=0.481355
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.016368 N
+    Fine (Interp): 0.016589 N
+    Predicted:    0.016754 N
+    Coarse vs Fine error: 0.000221 N
+    Pred vs Fine error:   0.000165 N
+    Improvement: 25.2%
+  Lift Forces:
+    Coarse:       -0.007645 N
+    Fine (Interp): -0.005420 N
+    Predicted:    -0.003639 N
+    Coarse vs Fine error: 0.002225 N
+    Pred vs Fine error:   0.001780 N
+    Improvement: 20.0%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_15_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_15_comprehensive_comparison.vtp
+  All field arrays have 129742 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.019060
+    Predicted:       0.029574
+    Improvement:     -55.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000323
+    Predicted:       0.000657
+    Improvement:     -103.1%
+
+============================================================
+Processing: run_16 (8/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_16/ahmed_16.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_16/boundary_16.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_16/boundary_16.vtp
+  Coarse mesh: 103780 cells, 108294 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 103780 cells
+  Coarse surface fields shape: (103780, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_16/boundary_16.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_16/boundary_16.vtp
+  Fine mesh: 1030476 cells, 1058466 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1030476 cells) to coarse mesh (103780 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (103780, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (103780, 4)
+Interpolated fine fields shape: (103780, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4554, std: 0.2843
+  Predictions - mean: 0.4589, std: 0.2906
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(103780, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027992, min=-0.855924, max=0.482707
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.014161 N
+    Fine (Interp): 0.015494 N
+    Predicted:    0.015950 N
+    Coarse vs Fine error: 0.001333 N
+    Pred vs Fine error:   0.000456 N
+    Improvement: 65.8%
+  Lift Forces:
+    Coarse:       -0.004569 N
+    Fine (Interp): -0.001691 N
+    Predicted:    0.000814 N
+    Coarse vs Fine error: 0.002878 N
+    Pred vs Fine error:   0.002506 N
+    Improvement: 12.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_16_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_16_comprehensive_comparison.vtp
+  All field arrays have 103780 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.018705
+    Predicted:       0.027479
+    Improvement:     -46.9%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000309
+    Predicted:       0.000646
+    Improvement:     -109.2%
+
+============================================================
+Processing: run_17 (9/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_17/ahmed_17.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_17/boundary_17.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_17/boundary_17.vtp
+  Coarse mesh: 132181 cells, 136287 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 132181 cells
+  Coarse surface fields shape: (132181, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_17/boundary_17.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_17/boundary_17.vtp
+  Fine mesh: 1293504 cells, 1328371 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1293504 cells) to coarse mesh (132181 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (132181, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (132181, 4)
+Interpolated fine fields shape: (132181, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4556, std: 0.2841
+  Predictions - mean: 0.4596, std: 0.2910
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(132181, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027973, min=-0.922760, max=0.479486
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.016346 N
+    Fine (Interp): 0.016582 N
+    Predicted:    0.017400 N
+    Coarse vs Fine error: 0.000237 N
+    Pred vs Fine error:   0.000817 N
+    Improvement: -245.3%
+  Lift Forces:
+    Coarse:       -0.010157 N
+    Fine (Interp): -0.009807 N
+    Predicted:    -0.006043 N
+    Coarse vs Fine error: 0.000350 N
+    Pred vs Fine error:   0.003764 N
+    Improvement: -975.3%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_17_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_17_comprehensive_comparison.vtp
+  All field arrays have 132181 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.012137
+    Predicted:       0.029150
+    Improvement:     -140.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000322
+    Predicted:       0.000658
+    Improvement:     -104.4%
+
+============================================================
+Processing: run_18 (10/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_18/ahmed_18.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_18/boundary_18.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_18/boundary_18.vtp
+  Coarse mesh: 105216 cells, 109251 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 105216 cells
+  Coarse surface fields shape: (105216, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_18/boundary_18.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_18/boundary_18.vtp
+  Fine mesh: 923916 cells, 949780 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (923916 cells) to coarse mesh (105216 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (105216, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (105216, 4)
+Interpolated fine fields shape: (105216, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4470, std: 0.2851
+  Predictions - mean: 0.4527, std: 0.2925
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(105216, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.035760, min=-1.244213, max=0.481727
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.022543 N
+    Fine (Interp): 0.021798 N
+    Predicted:    0.021722 N
+    Coarse vs Fine error: 0.000746 N
+    Pred vs Fine error:   0.000076 N
+    Improvement: 89.9%
+  Lift Forces:
+    Coarse:       0.020158 N
+    Fine (Interp): 0.028101 N
+    Predicted:    0.027025 N
+    Coarse vs Fine error: 0.007942 N
+    Pred vs Fine error:   0.001076 N
+    Improvement: 86.5%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_18_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_18_comprehensive_comparison.vtp
+  All field arrays have 105216 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.047250
+    Predicted:       0.041717
+    Improvement:     11.7%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000449
+    Predicted:       0.000710
+    Improvement:     -58.1%
+
+============================================================
+Processing: run_19 (11/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_19/ahmed_19.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_19/boundary_19.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_19/boundary_19.vtp
+  Coarse mesh: 108903 cells, 112750 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 108903 cells
+  Coarse surface fields shape: (108903, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_19/boundary_19.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_19/boundary_19.vtp
+  Fine mesh: 1035082 cells, 1063676 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1035082 cells) to coarse mesh (108903 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (108903, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (108903, 4)
+Interpolated fine fields shape: (108903, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4524, std: 0.2851
+  Predictions - mean: 0.4575, std: 0.2917
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(108903, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.030361, min=-0.912104, max=0.478645
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.016565 N
+    Fine (Interp): 0.016954 N
+    Predicted:    0.017306 N
+    Coarse vs Fine error: 0.000389 N
+    Pred vs Fine error:   0.000351 N
+    Improvement: 9.7%
+  Lift Forces:
+    Coarse:       -0.008034 N
+    Fine (Interp): -0.006844 N
+    Predicted:    -0.003996 N
+    Coarse vs Fine error: 0.001190 N
+    Pred vs Fine error:   0.002847 N
+    Improvement: -139.3%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_19_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_19_comprehensive_comparison.vtp
+  All field arrays have 108903 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.021045
+    Predicted:       0.029752
+    Improvement:     -41.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000345
+    Predicted:       0.000704
+    Improvement:     -104.0%
+
+============================================================
+Processing: run_2 (12/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_2/ahmed_2.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_2/boundary_2.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_2/boundary_2.vtp
+  Coarse mesh: 128238 cells, 132257 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 128238 cells
+  Coarse surface fields shape: (128238, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_2/boundary_2.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_2/boundary_2.vtp
+  Fine mesh: 1259821 cells, 1292868 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1259821 cells) to coarse mesh (128238 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (128238, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (128238, 4)
+Interpolated fine fields shape: (128238, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4520, std: 0.2838
+  Predictions - mean: 0.4573, std: 0.2905
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(128238, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.029798, min=-0.929581, max=0.478842
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.017949 N
+    Fine (Interp): 0.017114 N
+    Predicted:    0.017419 N
+    Coarse vs Fine error: 0.000835 N
+    Pred vs Fine error:   0.000305 N
+    Improvement: 63.5%
+  Lift Forces:
+    Coarse:       0.008714 N
+    Fine (Interp): 0.008695 N
+    Predicted:    0.006956 N
+    Coarse vs Fine error: 0.000019 N
+    Pred vs Fine error:   0.001739 N
+    Improvement: -9054.4%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_2_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_2_comprehensive_comparison.vtp
+  All field arrays have 128238 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.013119
+    Predicted:       0.028047
+    Improvement:     -113.8%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000342
+    Predicted:       0.000643
+    Improvement:     -87.9%
+
+============================================================
+Processing: run_20 (13/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_20/ahmed_20.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_20/boundary_20.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_20/boundary_20.vtp
+  Coarse mesh: 82823 cells, 86244 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 82823 cells
+  Coarse surface fields shape: (82823, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_20/boundary_20.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_20/boundary_20.vtp
+  Fine mesh: 803469 cells, 825478 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (803469 cells) to coarse mesh (82823 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (82823, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (82823, 4)
+Interpolated fine fields shape: (82823, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4543, std: 0.2831
+  Predictions - mean: 0.4586, std: 0.2904
+Prediction completed in 0.14 seconds
+After removing batch dim: shape=(82823, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027835, min=-0.968355, max=0.481457
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.012190 N
+    Fine (Interp): 0.012030 N
+    Predicted:    0.012135 N
+    Coarse vs Fine error: 0.000161 N
+    Pred vs Fine error:   0.000105 N
+    Improvement: 34.4%
+  Lift Forces:
+    Coarse:       0.002502 N
+    Fine (Interp): 0.011357 N
+    Predicted:    0.010225 N
+    Coarse vs Fine error: 0.008856 N
+    Pred vs Fine error:   0.001132 N
+    Improvement: 87.2%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_20_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_20_comprehensive_comparison.vtp
+  All field arrays have 82823 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.038469
+    Predicted:       0.032832
+    Improvement:     14.7%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000405
+    Predicted:       0.000711
+    Improvement:     -75.4%
+
+============================================================
+Processing: run_21 (14/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_21/ahmed_21.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_21/boundary_21.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_21/boundary_21.vtp
+  Coarse mesh: 107516 cells, 111637 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 107516 cells
+  Coarse surface fields shape: (107516, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_21/boundary_21.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_21/boundary_21.vtp
+  Fine mesh: 1080538 cells, 1110592 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1080538 cells) to coarse mesh (107516 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (107516, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (107516, 4)
+Interpolated fine fields shape: (107516, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4546, std: 0.2831
+  Predictions - mean: 0.4592, std: 0.2903
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(107516, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.026978, min=-1.097274, max=0.481563
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.016732 N
+    Fine (Interp): 0.013793 N
+    Predicted:    0.013535 N
+    Coarse vs Fine error: 0.002939 N
+    Pred vs Fine error:   0.000258 N
+    Improvement: 91.2%
+  Lift Forces:
+    Coarse:       0.016430 N
+    Fine (Interp): 0.016400 N
+    Predicted:    0.016894 N
+    Coarse vs Fine error: 0.000030 N
+    Pred vs Fine error:   0.000494 N
+    Improvement: -1545.7%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_21_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_21_comprehensive_comparison.vtp
+  All field arrays have 107516 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.032878
+    Predicted:       0.035457
+    Improvement:     -7.8%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000371
+    Predicted:       0.000663
+    Improvement:     -78.5%
+
+============================================================
+Processing: run_22 (15/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_22/ahmed_22.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_22/boundary_22.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_22/boundary_22.vtp
+  Coarse mesh: 104436 cells, 108575 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 104436 cells
+  Coarse surface fields shape: (104436, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_22/boundary_22.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_22/boundary_22.vtp
+  Fine mesh: 960849 cells, 986845 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (960849 cells) to coarse mesh (104436 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (104436, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (104436, 4)
+Interpolated fine fields shape: (104436, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4513, std: 0.2865
+  Predictions - mean: 0.4551, std: 0.2922
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(104436, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.033077, min=-0.927929, max=0.483264
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.017396 N
+    Fine (Interp): 0.018435 N
+    Predicted:    0.019157 N
+    Coarse vs Fine error: 0.001039 N
+    Pred vs Fine error:   0.000722 N
+    Improvement: 30.5%
+  Lift Forces:
+    Coarse:       -0.004552 N
+    Fine (Interp): 0.000105 N
+    Predicted:    0.001387 N
+    Coarse vs Fine error: 0.004657 N
+    Pred vs Fine error:   0.001282 N
+    Improvement: 72.5%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_22_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_22_comprehensive_comparison.vtp
+  All field arrays have 104436 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.023466
+    Predicted:       0.028200
+    Improvement:     -20.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000347
+    Predicted:       0.000700
+    Improvement:     -101.8%
+
+============================================================
+Processing: run_23 (16/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_23/ahmed_23.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_23/boundary_23.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_23/boundary_23.vtp
+  Coarse mesh: 115472 cells, 119269 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 115472 cells
+  Coarse surface fields shape: (115472, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_23/boundary_23.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_23/boundary_23.vtp
+  Fine mesh: 1161372 cells, 1192424 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1161372 cells) to coarse mesh (115472 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (115472, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (115472, 4)
+Interpolated fine fields shape: (115472, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4516, std: 0.2856
+  Predictions - mean: 0.4549, std: 0.2922
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(115472, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.032971, min=-1.073429, max=0.482112
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.019076 N
+    Fine (Interp): 0.020122 N
+    Predicted:    0.020359 N
+    Coarse vs Fine error: 0.001045 N
+    Pred vs Fine error:   0.000237 N
+    Improvement: 77.3%
+  Lift Forces:
+    Coarse:       0.004539 N
+    Fine (Interp): 0.026760 N
+    Predicted:    0.022905 N
+    Coarse vs Fine error: 0.022221 N
+    Pred vs Fine error:   0.003855 N
+    Improvement: 82.6%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_23_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_23_comprehensive_comparison.vtp
+  All field arrays have 115472 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.059557
+    Predicted:       0.040128
+    Improvement:     32.6%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000501
+    Predicted:       0.000675
+    Improvement:     -34.8%
+
+============================================================
+Processing: run_24 (17/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_24/ahmed_24.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_24/boundary_24.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_24/boundary_24.vtp
+  Coarse mesh: 104114 cells, 108346 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 104114 cells
+  Coarse surface fields shape: (104114, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_24/boundary_24.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_24/boundary_24.vtp
+  Fine mesh: 983740 cells, 1010894 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (983740 cells) to coarse mesh (104114 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (104114, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (104114, 4)
+Interpolated fine fields shape: (104114, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4544, std: 0.2840
+  Predictions - mean: 0.4584, std: 0.2906
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(104114, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028425, min=-0.804725, max=0.481555
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.014774 N
+    Fine (Interp): 0.016298 N
+    Predicted:    0.016667 N
+    Coarse vs Fine error: 0.001524 N
+    Pred vs Fine error:   0.000369 N
+    Improvement: 75.8%
+  Lift Forces:
+    Coarse:       -0.003986 N
+    Fine (Interp): -0.000946 N
+    Predicted:    0.001749 N
+    Coarse vs Fine error: 0.003040 N
+    Pred vs Fine error:   0.002695 N
+    Improvement: 11.4%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_24_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_24_comprehensive_comparison.vtp
+  All field arrays have 104114 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.019072
+    Predicted:       0.027188
+    Improvement:     -42.6%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000317
+    Predicted:       0.000679
+    Improvement:     -114.3%
+
+============================================================
+Processing: run_25 (18/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_25/ahmed_25.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_25/boundary_25.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_25/boundary_25.vtp
+  Coarse mesh: 126204 cells, 130356 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 126204 cells
+  Coarse surface fields shape: (126204, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_25/boundary_25.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_25/boundary_25.vtp
+  Fine mesh: 1253690 cells, 1287151 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1253690 cells) to coarse mesh (126204 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (126204, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (126204, 4)
+Interpolated fine fields shape: (126204, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4534, std: 0.2831
+  Predictions - mean: 0.4584, std: 0.2901
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(126204, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028344, min=-0.814260, max=0.481674
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.016330 N
+    Fine (Interp): 0.016624 N
+    Predicted:    0.016829 N
+    Coarse vs Fine error: 0.000295 N
+    Pred vs Fine error:   0.000205 N
+    Improvement: 30.6%
+  Lift Forces:
+    Coarse:       -0.000230 N
+    Fine (Interp): -0.000161 N
+    Predicted:    0.000387 N
+    Coarse vs Fine error: 0.000068 N
+    Pred vs Fine error:   0.000549 N
+    Improvement: -702.7%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_25_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_25_comprehensive_comparison.vtp
+  All field arrays have 126204 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.010291
+    Predicted:       0.027044
+    Improvement:     -162.8%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000313
+    Predicted:       0.000633
+    Improvement:     -101.8%
+
+============================================================
+Processing: run_26 (19/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_26/ahmed_26.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_26/boundary_26.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_26/boundary_26.vtp
+  Coarse mesh: 116817 cells, 121194 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 116817 cells
+  Coarse surface fields shape: (116817, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_26/boundary_26.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_26/boundary_26.vtp
+  Fine mesh: 1135680 cells, 1165571 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1135680 cells) to coarse mesh (116817 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (116817, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (116817, 4)
+Interpolated fine fields shape: (116817, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4552, std: 0.2830
+  Predictions - mean: 0.4564, std: 0.2918
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(116817, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.031914, min=-0.987137, max=0.481867
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.015229 N
+    Fine (Interp): 0.022903 N
+    Predicted:    0.021012 N
+    Coarse vs Fine error: 0.007673 N
+    Pred vs Fine error:   0.001891 N
+    Improvement: 75.4%
+  Lift Forces:
+    Coarse:       -0.002768 N
+    Fine (Interp): 0.023046 N
+    Predicted:    0.022156 N
+    Coarse vs Fine error: 0.025814 N
+    Pred vs Fine error:   0.000890 N
+    Improvement: 96.6%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_26_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_26_comprehensive_comparison.vtp
+  All field arrays have 116817 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.098697
+    Predicted:       0.039669
+    Improvement:     59.8%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000470
+    Predicted:       0.000753
+    Improvement:     -60.2%
+
+============================================================
+Processing: run_27 (20/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_27/ahmed_27.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_27/boundary_27.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_27/boundary_27.vtp
+  Coarse mesh: 106351 cells, 110118 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 106351 cells
+  Coarse surface fields shape: (106351, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_27/boundary_27.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_27/boundary_27.vtp
+  Fine mesh: 1022580 cells, 1050167 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1022580 cells) to coarse mesh (106351 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (106351, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (106351, 4)
+Interpolated fine fields shape: (106351, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4550, std: 0.2823
+  Predictions - mean: 0.4602, std: 0.2897
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(106351, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.026418, min=-0.769430, max=0.482465
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.012910 N
+    Fine (Interp): 0.012766 N
+    Predicted:    0.012501 N
+    Coarse vs Fine error: 0.000145 N
+    Pred vs Fine error:   0.000265 N
+    Improvement: -83.2%
+  Lift Forces:
+    Coarse:       0.002042 N
+    Fine (Interp): 0.003049 N
+    Predicted:    0.001803 N
+    Coarse vs Fine error: 0.001007 N
+    Pred vs Fine error:   0.001246 N
+    Improvement: -23.8%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_27_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_27_comprehensive_comparison.vtp
+  All field arrays have 106351 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.010768
+    Predicted:       0.027339
+    Improvement:     -153.9%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000297
+    Predicted:       0.000653
+    Improvement:     -119.5%
+
+============================================================
+Processing: run_28 (21/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_28/ahmed_28.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_28/boundary_28.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_28/boundary_28.vtp
+  Coarse mesh: 115511 cells, 119727 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 115511 cells
+  Coarse surface fields shape: (115511, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_28/boundary_28.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_28/boundary_28.vtp
+  Fine mesh: 1077094 cells, 1106471 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1077094 cells) to coarse mesh (115511 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (115511, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (115511, 4)
+Interpolated fine fields shape: (115511, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4567, std: 0.2836
+  Predictions - mean: 0.4609, std: 0.2906
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(115511, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.026713, min=-0.892789, max=0.481688
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.013402 N
+    Fine (Interp): 0.013763 N
+    Predicted:    0.014194 N
+    Coarse vs Fine error: 0.000362 N
+    Pred vs Fine error:   0.000430 N
+    Improvement: -18.9%
+  Lift Forces:
+    Coarse:       -0.004315 N
+    Fine (Interp): -0.002840 N
+    Predicted:    0.000353 N
+    Coarse vs Fine error: 0.001475 N
+    Pred vs Fine error:   0.003193 N
+    Improvement: -116.6%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_28_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_28_comprehensive_comparison.vtp
+  All field arrays have 115511 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.012412
+    Predicted:       0.028032
+    Improvement:     -125.8%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000296
+    Predicted:       0.000664
+    Improvement:     -124.1%
+
+============================================================
+Processing: run_29 (22/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_29/ahmed_29.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_29/boundary_29.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_29/boundary_29.vtp
+  Coarse mesh: 112774 cells, 116720 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 112774 cells
+  Coarse surface fields shape: (112774, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_29/boundary_29.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_29/boundary_29.vtp
+  Fine mesh: 1096496 cells, 1125935 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1096496 cells) to coarse mesh (112774 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (112774, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (112774, 4)
+Interpolated fine fields shape: (112774, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4544, std: 0.2839
+  Predictions - mean: 0.4589, std: 0.2910
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(112774, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028343, min=-0.894110, max=0.478496
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.015523 N
+    Fine (Interp): 0.015135 N
+    Predicted:    0.016406 N
+    Coarse vs Fine error: 0.000388 N
+    Pred vs Fine error:   0.001271 N
+    Improvement: -227.5%
+  Lift Forces:
+    Coarse:       -0.006673 N
+    Fine (Interp): -0.005484 N
+    Predicted:    -0.002876 N
+    Coarse vs Fine error: 0.001189 N
+    Pred vs Fine error:   0.002609 N
+    Improvement: -119.4%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_29_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_29_comprehensive_comparison.vtp
+  All field arrays have 112774 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.013968
+    Predicted:       0.028241
+    Improvement:     -102.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000312
+    Predicted:       0.000692
+    Improvement:     -121.9%
+
+============================================================
+Processing: run_3 (23/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_3/ahmed_3.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_3/boundary_3.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_3/boundary_3.vtp
+  Coarse mesh: 93169 cells, 96707 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 93169 cells
+  Coarse surface fields shape: (93169, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_3/boundary_3.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_3/boundary_3.vtp
+  Fine mesh: 936935 cells, 962658 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (936935 cells) to coarse mesh (93169 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (93169, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (93169, 4)
+Interpolated fine fields shape: (93169, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4527, std: 0.2844
+  Predictions - mean: 0.4582, std: 0.2908
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(93169, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028274, min=-0.863892, max=0.481430
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.014137 N
+    Fine (Interp): 0.013480 N
+    Predicted:    0.012856 N
+    Coarse vs Fine error: 0.000657 N
+    Pred vs Fine error:   0.000624 N
+    Improvement: 5.0%
+  Lift Forces:
+    Coarse:       0.008661 N
+    Fine (Interp): 0.012679 N
+    Predicted:    0.009512 N
+    Coarse vs Fine error: 0.004018 N
+    Pred vs Fine error:   0.003168 N
+    Improvement: 21.2%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_3_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_3_comprehensive_comparison.vtp
+  All field arrays have 93169 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.022489
+    Predicted:       0.030987
+    Improvement:     -37.8%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000362
+    Predicted:       0.000670
+    Improvement:     -84.8%
+
+============================================================
+Processing: run_30 (24/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_30/ahmed_30.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_30/boundary_30.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_30/boundary_30.vtp
+  Coarse mesh: 98569 cells, 102024 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 98569 cells
+  Coarse surface fields shape: (98569, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_30/boundary_30.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_30/boundary_30.vtp
+  Fine mesh: 907610 cells, 932468 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (907610 cells) to coarse mesh (98569 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (98569, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (98569, 4)
+Interpolated fine fields shape: (98569, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4543, std: 0.2840
+  Predictions - mean: 0.4583, std: 0.2906
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(98569, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028509, min=-0.819825, max=0.481038
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.013834 N
+    Fine (Interp): 0.014995 N
+    Predicted:    0.014944 N
+    Coarse vs Fine error: 0.001161 N
+    Pred vs Fine error:   0.000052 N
+    Improvement: 95.5%
+  Lift Forces:
+    Coarse:       -0.004832 N
+    Fine (Interp): -0.003360 N
+    Predicted:    -0.001104 N
+    Coarse vs Fine error: 0.001472 N
+    Pred vs Fine error:   0.002256 N
+    Improvement: -53.3%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_30_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_30_comprehensive_comparison.vtp
+  All field arrays have 98569 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.014081
+    Predicted:       0.026670
+    Improvement:     -89.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000315
+    Predicted:       0.000694
+    Improvement:     -120.2%
+
+============================================================
+Processing: run_31 (25/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_31/ahmed_31.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_31/boundary_31.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_31/boundary_31.vtp
+  Coarse mesh: 119936 cells, 124107 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 119936 cells
+  Coarse surface fields shape: (119936, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_31/boundary_31.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_31/boundary_31.vtp
+  Fine mesh: 1093647 cells, 1122501 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1093647 cells) to coarse mesh (119936 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (119936, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (119936, 4)
+Interpolated fine fields shape: (119936, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4546, std: 0.2842
+  Predictions - mean: 0.4586, std: 0.2910
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(119936, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.029169, min=-0.921362, max=0.479511
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.015502 N
+    Fine (Interp): 0.016182 N
+    Predicted:    0.016995 N
+    Coarse vs Fine error: 0.000680 N
+    Pred vs Fine error:   0.000814 N
+    Improvement: -19.7%
+  Lift Forces:
+    Coarse:       -0.007945 N
+    Fine (Interp): -0.006062 N
+    Predicted:    -0.002506 N
+    Coarse vs Fine error: 0.001882 N
+    Pred vs Fine error:   0.003557 N
+    Improvement: -88.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_31_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_31_comprehensive_comparison.vtp
+  All field arrays have 119936 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.017086
+    Predicted:       0.027269
+    Improvement:     -59.6%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000317
+    Predicted:       0.000705
+    Improvement:     -122.1%
+
+============================================================
+Processing: run_32 (26/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_32/ahmed_32.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_32/boundary_32.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_32/boundary_32.vtp
+  Coarse mesh: 93286 cells, 97140 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 93286 cells
+  Coarse surface fields shape: (93286, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_32/boundary_32.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_32/boundary_32.vtp
+  Fine mesh: 828145 cells, 851533 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (828145 cells) to coarse mesh (93286 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (93286, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (93286, 4)
+Interpolated fine fields shape: (93286, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4555, std: 0.2839
+  Predictions - mean: 0.4595, std: 0.2907
+Prediction completed in 0.14 seconds
+After removing batch dim: shape=(93286, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027774, min=-0.831092, max=0.484431
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.012408 N
+    Fine (Interp): 0.013227 N
+    Predicted:    0.013924 N
+    Coarse vs Fine error: 0.000819 N
+    Pred vs Fine error:   0.000697 N
+    Improvement: 15.0%
+  Lift Forces:
+    Coarse:       -0.000966 N
+    Fine (Interp): 0.001557 N
+    Predicted:    0.001724 N
+    Coarse vs Fine error: 0.002523 N
+    Pred vs Fine error:   0.000167 N
+    Improvement: 93.4%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_32_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_32_comprehensive_comparison.vtp
+  All field arrays have 93286 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.016327
+    Predicted:       0.026470
+    Improvement:     -62.1%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000304
+    Predicted:       0.000687
+    Improvement:     -126.2%
+
+============================================================
+Processing: run_33 (27/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_33/ahmed_33.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_33/boundary_33.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_33/boundary_33.vtp
+  Coarse mesh: 111060 cells, 115358 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 111060 cells
+  Coarse surface fields shape: (111060, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_33/boundary_33.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_33/boundary_33.vtp
+  Fine mesh: 1005374 cells, 1032781 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1005374 cells) to coarse mesh (111060 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (111060, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (111060, 4)
+Interpolated fine fields shape: (111060, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4579, std: 0.2826
+  Predictions - mean: 0.4615, std: 0.2896
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(111060, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.025021, min=-0.821890, max=0.481052
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.011873 N
+    Fine (Interp): 0.012568 N
+    Predicted:    0.013173 N
+    Coarse vs Fine error: 0.000695 N
+    Pred vs Fine error:   0.000604 N
+    Improvement: 13.1%
+  Lift Forces:
+    Coarse:       -0.002557 N
+    Fine (Interp): -0.000633 N
+    Predicted:    0.000331 N
+    Coarse vs Fine error: 0.001924 N
+    Pred vs Fine error:   0.000964 N
+    Improvement: 49.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_33_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_33_comprehensive_comparison.vtp
+  All field arrays have 111060 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.014014
+    Predicted:       0.028264
+    Improvement:     -101.7%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000294
+    Predicted:       0.000639
+    Improvement:     -117.5%
+
+============================================================
+Processing: run_34 (28/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_34/ahmed_34.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_34/boundary_34.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_34/boundary_34.vtp
+  Coarse mesh: 120861 cells, 125523 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 120861 cells
+  Coarse surface fields shape: (120861, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_34/boundary_34.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_34/boundary_34.vtp
+  Fine mesh: 1176694 cells, 1207932 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1176694 cells) to coarse mesh (120861 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (120861, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (120861, 4)
+Interpolated fine fields shape: (120861, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4555, std: 0.2832
+  Predictions - mean: 0.4550, std: 0.2920
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(120861, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.033870, min=-0.913565, max=0.480389
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.015352 N
+    Fine (Interp): 0.024799 N
+    Predicted:    0.022537 N
+    Coarse vs Fine error: 0.009447 N
+    Pred vs Fine error:   0.002262 N
+    Improvement: 76.1%
+  Lift Forces:
+    Coarse:       -0.002731 N
+    Fine (Interp): 0.026889 N
+    Predicted:    0.020417 N
+    Coarse vs Fine error: 0.029619 N
+    Pred vs Fine error:   0.006472 N
+    Improvement: 78.2%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_34_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_34_comprehensive_comparison.vtp
+  All field arrays have 120861 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.134060
+    Predicted:       0.065399
+    Improvement:     51.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000611
+    Predicted:       0.000842
+    Improvement:     -37.9%
+
+============================================================
+Processing: run_35 (29/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_35/ahmed_35.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_35/boundary_35.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_35/boundary_35.vtp
+  Coarse mesh: 103284 cells, 107162 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 103284 cells
+  Coarse surface fields shape: (103284, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_35/boundary_35.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_35/boundary_35.vtp
+  Fine mesh: 927504 cells, 952723 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (927504 cells) to coarse mesh (103284 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (103284, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (103284, 4)
+Interpolated fine fields shape: (103284, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4551, std: 0.2834
+  Predictions - mean: 0.4594, std: 0.2901
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(103284, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027743, min=-0.828382, max=0.482495
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.013079 N
+    Fine (Interp): 0.013934 N
+    Predicted:    0.014367 N
+    Coarse vs Fine error: 0.000855 N
+    Pred vs Fine error:   0.000433 N
+    Improvement: 49.3%
+  Lift Forces:
+    Coarse:       -0.004160 N
+    Fine (Interp): -0.002290 N
+    Predicted:    -0.001308 N
+    Coarse vs Fine error: 0.001870 N
+    Pred vs Fine error:   0.000982 N
+    Improvement: 47.5%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_35_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_35_comprehensive_comparison.vtp
+  All field arrays have 103284 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.015213
+    Predicted:       0.026408
+    Improvement:     -73.6%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000307
+    Predicted:       0.000672
+    Improvement:     -118.7%
+
+============================================================
+Processing: run_36 (30/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_36/ahmed_36.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_36/boundary_36.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_36/boundary_36.vtp
+  Coarse mesh: 88387 cells, 91772 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 88387 cells
+  Coarse surface fields shape: (88387, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_36/boundary_36.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_36/boundary_36.vtp
+  Fine mesh: 800458 cells, 822562 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (800458 cells) to coarse mesh (88387 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (88387, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (88387, 4)
+Interpolated fine fields shape: (88387, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4532, std: 0.2838
+  Predictions - mean: 0.4585, std: 0.2908
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(88387, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028367, min=-0.931195, max=0.481703
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.012018 N
+    Fine (Interp): 0.011413 N
+    Predicted:    0.011122 N
+    Coarse vs Fine error: 0.000605 N
+    Pred vs Fine error:   0.000291 N
+    Improvement: 51.9%
+  Lift Forces:
+    Coarse:       0.006638 N
+    Fine (Interp): 0.010783 N
+    Predicted:    0.010268 N
+    Coarse vs Fine error: 0.004145 N
+    Pred vs Fine error:   0.000516 N
+    Improvement: 87.6%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_36_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_36_comprehensive_comparison.vtp
+  All field arrays have 88387 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.020905
+    Predicted:       0.031180
+    Improvement:     -49.1%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000345
+    Predicted:       0.000689
+    Improvement:     -99.6%
+
+============================================================
+Processing: run_37 (31/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_37/ahmed_37.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_37/boundary_37.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_37/boundary_37.vtp
+  Coarse mesh: 119954 cells, 124322 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 119954 cells
+  Coarse surface fields shape: (119954, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_37/boundary_37.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_37/boundary_37.vtp
+  Fine mesh: 1157918 cells, 1188793 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1157918 cells) to coarse mesh (119954 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (119954, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (119954, 4)
+Interpolated fine fields shape: (119954, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4533, std: 0.2847
+  Predictions - mean: 0.4577, std: 0.2910
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(119954, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.029567, min=-0.888806, max=0.484196
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.017547 N
+    Fine (Interp): 0.018889 N
+    Predicted:    0.018582 N
+    Coarse vs Fine error: 0.001342 N
+    Pred vs Fine error:   0.000307 N
+    Improvement: 77.1%
+  Lift Forces:
+    Coarse:       -0.004751 N
+    Fine (Interp): -0.001113 N
+    Predicted:    0.000428 N
+    Coarse vs Fine error: 0.003638 N
+    Pred vs Fine error:   0.001541 N
+    Improvement: 57.6%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_37_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_37_comprehensive_comparison.vtp
+  All field arrays have 119954 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.016631
+    Predicted:       0.028160
+    Improvement:     -69.3%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000348
+    Predicted:       0.000665
+    Improvement:     -91.3%
+
+============================================================
+Processing: run_38 (32/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_38/ahmed_38.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_38/boundary_38.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_38/boundary_38.vtp
+  Coarse mesh: 136821 cells, 141383 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 136821 cells
+  Coarse surface fields shape: (136821, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_38/boundary_38.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_38/boundary_38.vtp
+  Fine mesh: 1373339 cells, 1408647 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1373339 cells) to coarse mesh (136821 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (136821, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (136821, 4)
+Interpolated fine fields shape: (136821, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4523, std: 0.2857
+  Predictions - mean: 0.4562, std: 0.2919
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(136821, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.031658, min=-0.972971, max=0.480428
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.021215 N
+    Fine (Interp): 0.021934 N
+    Predicted:    0.022312 N
+    Coarse vs Fine error: 0.000720 N
+    Pred vs Fine error:   0.000378 N
+    Improvement: 47.4%
+  Lift Forces:
+    Coarse:       -0.008226 N
+    Fine (Interp): -0.006887 N
+    Predicted:    -0.002931 N
+    Coarse vs Fine error: 0.001339 N
+    Pred vs Fine error:   0.003956 N
+    Improvement: -195.4%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_38_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_38_comprehensive_comparison.vtp
+  All field arrays have 136821 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.016893
+    Predicted:       0.028356
+    Improvement:     -67.9%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000341
+    Predicted:       0.000661
+    Improvement:     -94.1%
+
+============================================================
+Processing: run_39 (33/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_39/ahmed_39.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_39/boundary_39.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_39/boundary_39.vtp
+  Coarse mesh: 122103 cells, 126304 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 122103 cells
+  Coarse surface fields shape: (122103, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_39/boundary_39.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_39/boundary_39.vtp
+  Fine mesh: 1168218 cells, 1199546 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1168218 cells) to coarse mesh (122103 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (122103, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (122103, 4)
+Interpolated fine fields shape: (122103, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4542, std: 0.2843
+  Predictions - mean: 0.4584, std: 0.2907
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(122103, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.029001, min=-0.890669, max=0.485826
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.016189 N
+    Fine (Interp): 0.016551 N
+    Predicted:    0.017687 N
+    Coarse vs Fine error: 0.000362 N
+    Pred vs Fine error:   0.001135 N
+    Improvement: -213.3%
+  Lift Forces:
+    Coarse:       -0.006161 N
+    Fine (Interp): -0.003091 N
+    Predicted:    -0.001654 N
+    Coarse vs Fine error: 0.003070 N
+    Pred vs Fine error:   0.001437 N
+    Improvement: 53.2%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_39_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_39_comprehensive_comparison.vtp
+  All field arrays have 122103 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.028927
+    Predicted:       0.032373
+    Improvement:     -11.9%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000366
+    Predicted:       0.000691
+    Improvement:     -88.8%
+
+============================================================
+Processing: run_4 (34/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_4/ahmed_4.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_4/boundary_4.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_4/boundary_4.vtp
+  Coarse mesh: 124749 cells, 128869 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 124749 cells
+  Coarse surface fields shape: (124749, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_4/boundary_4.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_4/boundary_4.vtp
+  Fine mesh: 1235746 cells, 1268335 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1235746 cells) to coarse mesh (124749 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (124749, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (124749, 4)
+Interpolated fine fields shape: (124749, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4528, std: 0.2855
+  Predictions - mean: 0.4552, std: 0.2918
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(124749, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.033179, min=-0.957927, max=0.480457
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.018551 N
+    Fine (Interp): 0.021341 N
+    Predicted:    0.020847 N
+    Coarse vs Fine error: 0.002790 N
+    Pred vs Fine error:   0.000494 N
+    Improvement: 82.3%
+  Lift Forces:
+    Coarse:       -0.004836 N
+    Fine (Interp): 0.006470 N
+    Predicted:    0.005205 N
+    Coarse vs Fine error: 0.011306 N
+    Pred vs Fine error:   0.001265 N
+    Improvement: 88.8%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_4_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_4_comprehensive_comparison.vtp
+  All field arrays have 124749 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.059386
+    Predicted:       0.038248
+    Improvement:     35.6%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000464
+    Predicted:       0.000738
+    Improvement:     -59.0%
+
+============================================================
+Processing: run_40 (35/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_40/ahmed_40.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_40/boundary_40.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_40/boundary_40.vtp
+  Coarse mesh: 100814 cells, 104694 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 100814 cells
+  Coarse surface fields shape: (100814, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_40/boundary_40.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_40/boundary_40.vtp
+  Fine mesh: 923818 cells, 949463 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (923818 cells) to coarse mesh (100814 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (100814, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (100814, 4)
+Interpolated fine fields shape: (100814, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4526, std: 0.2838
+  Predictions - mean: 0.4569, std: 0.2906
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(100814, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.030422, min=-0.889969, max=0.478967
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.014405 N
+    Fine (Interp): 0.015736 N
+    Predicted:    0.015587 N
+    Coarse vs Fine error: 0.001331 N
+    Pred vs Fine error:   0.000148 N
+    Improvement: 88.8%
+  Lift Forces:
+    Coarse:       -0.002159 N
+    Fine (Interp): 0.001872 N
+    Predicted:    0.002436 N
+    Coarse vs Fine error: 0.004031 N
+    Pred vs Fine error:   0.000564 N
+    Improvement: 86.0%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_40_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_40_comprehensive_comparison.vtp
+  All field arrays have 100814 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.031516
+    Predicted:       0.031900
+    Improvement:     -1.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000359
+    Predicted:       0.000725
+    Improvement:     -102.3%
+
+============================================================
+Processing: run_41 (36/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_41/ahmed_41.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_41/boundary_41.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_41/boundary_41.vtp
+  Coarse mesh: 110218 cells, 114526 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 110218 cells
+  Coarse surface fields shape: (110218, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_41/boundary_41.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_41/boundary_41.vtp
+  Fine mesh: 1084286 cells, 1113517 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1084286 cells) to coarse mesh (110218 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (110218, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (110218, 4)
+Interpolated fine fields shape: (110218, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4476, std: 0.2863
+  Predictions - mean: 0.4517, std: 0.2931
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(110218, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.036280, min=-1.202755, max=0.481395
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.024710 N
+    Fine (Interp): 0.022041 N
+    Predicted:    0.022861 N
+    Coarse vs Fine error: 0.002669 N
+    Pred vs Fine error:   0.000821 N
+    Improvement: 69.2%
+  Lift Forces:
+    Coarse:       0.035513 N
+    Fine (Interp): 0.033579 N
+    Predicted:    0.033536 N
+    Coarse vs Fine error: 0.001934 N
+    Pred vs Fine error:   0.000043 N
+    Improvement: 97.8%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_41_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_41_comprehensive_comparison.vtp
+  All field arrays have 110218 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.059325
+    Predicted:       0.046899
+    Improvement:     20.9%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000499
+    Predicted:       0.000708
+    Improvement:     -42.0%
+
+============================================================
+Processing: run_42 (37/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_42/ahmed_42.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_42/boundary_42.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_42/boundary_42.vtp
+  Coarse mesh: 114033 cells, 118018 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 114033 cells
+  Coarse surface fields shape: (114033, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_42/boundary_42.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_42/boundary_42.vtp
+  Fine mesh: 1095966 cells, 1125390 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1095966 cells) to coarse mesh (114033 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (114033, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (114033, 4)
+Interpolated fine fields shape: (114033, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4547, std: 0.2843
+  Predictions - mean: 0.4588, std: 0.2912
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(114033, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028968, min=-0.935420, max=0.482064
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.015014 N
+    Fine (Interp): 0.014962 N
+    Predicted:    0.016233 N
+    Coarse vs Fine error: 0.000052 N
+    Pred vs Fine error:   0.001271 N
+    Improvement: -2356.2%
+  Lift Forces:
+    Coarse:       -0.006610 N
+    Fine (Interp): -0.004312 N
+    Predicted:    -0.000934 N
+    Coarse vs Fine error: 0.002298 N
+    Pred vs Fine error:   0.003379 N
+    Improvement: -47.0%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_42_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_42_comprehensive_comparison.vtp
+  All field arrays have 114033 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.027405
+    Predicted:       0.032450
+    Improvement:     -18.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000356
+    Predicted:       0.000724
+    Improvement:     -103.6%
+
+============================================================
+Processing: run_43 (38/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_43/ahmed_43.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_43/boundary_43.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_43/boundary_43.vtp
+  Coarse mesh: 89073 cells, 92804 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 89073 cells
+  Coarse surface fields shape: (89073, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_43/boundary_43.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_43/boundary_43.vtp
+  Fine mesh: 820954 cells, 844269 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (820954 cells) to coarse mesh (89073 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (89073, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (89073, 4)
+Interpolated fine fields shape: (89073, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4554, std: 0.2836
+  Predictions - mean: 0.4598, std: 0.2905
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(89073, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027089, min=-0.797706, max=0.480860
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.011972 N
+    Fine (Interp): 0.013186 N
+    Predicted:    0.013469 N
+    Coarse vs Fine error: 0.001214 N
+    Pred vs Fine error:   0.000283 N
+    Improvement: 76.7%
+  Lift Forces:
+    Coarse:       -0.003527 N
+    Fine (Interp): -0.001913 N
+    Predicted:    -0.000634 N
+    Coarse vs Fine error: 0.001614 N
+    Pred vs Fine error:   0.001279 N
+    Improvement: 20.7%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_43_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_43_comprehensive_comparison.vtp
+  All field arrays have 89073 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.014884
+    Predicted:       0.026147
+    Improvement:     -75.7%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000312
+    Predicted:       0.000699
+    Improvement:     -124.3%
+
+============================================================
+Processing: run_44 (39/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_44/ahmed_44.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_44/boundary_44.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_44/boundary_44.vtp
+  Coarse mesh: 112918 cells, 116760 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 112918 cells
+  Coarse surface fields shape: (112918, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_44/boundary_44.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_44/boundary_44.vtp
+  Fine mesh: 1108443 cells, 1138721 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1108443 cells) to coarse mesh (112918 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (112918, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (112918, 4)
+Interpolated fine fields shape: (112918, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4557, std: 0.2831
+  Predictions - mean: 0.4609, std: 0.2904
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(112918, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.026071, min=-0.858769, max=0.480765
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.013136 N
+    Fine (Interp): 0.013476 N
+    Predicted:    0.013887 N
+    Coarse vs Fine error: 0.000340 N
+    Pred vs Fine error:   0.000411 N
+    Improvement: -20.7%
+  Lift Forces:
+    Coarse:       -0.002228 N
+    Fine (Interp): -0.002135 N
+    Predicted:    -0.000422 N
+    Coarse vs Fine error: 0.000093 N
+    Pred vs Fine error:   0.001713 N
+    Improvement: -1744.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_44_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_44_comprehensive_comparison.vtp
+  All field arrays have 112918 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.009245
+    Predicted:       0.026936
+    Improvement:     -191.3%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000292
+    Predicted:       0.000655
+    Improvement:     -124.3%
+
+============================================================
+Processing: run_45 (40/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_45/ahmed_45.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_45/boundary_45.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_45/boundary_45.vtp
+  Coarse mesh: 113479 cells, 117848 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 113479 cells
+  Coarse surface fields shape: (113479, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_45/boundary_45.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_45/boundary_45.vtp
+  Fine mesh: 1063979 cells, 1092106 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1063979 cells) to coarse mesh (113479 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (113479, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (113479, 4)
+Interpolated fine fields shape: (113479, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4577, std: 0.2826
+  Predictions - mean: 0.4621, std: 0.2897
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(113479, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.024390, min=-0.797970, max=0.481117
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.012358 N
+    Fine (Interp): 0.012764 N
+    Predicted:    0.013196 N
+    Coarse vs Fine error: 0.000406 N
+    Pred vs Fine error:   0.000432 N
+    Improvement: -6.5%
+  Lift Forces:
+    Coarse:       -0.002694 N
+    Fine (Interp): -0.001649 N
+    Predicted:    -0.000261 N
+    Coarse vs Fine error: 0.001044 N
+    Pred vs Fine error:   0.001388 N
+    Improvement: -32.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_45_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_45_comprehensive_comparison.vtp
+  All field arrays have 113479 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.014112
+    Predicted:       0.027680
+    Improvement:     -96.1%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000308
+    Predicted:       0.000649
+    Improvement:     -110.7%
+
+============================================================
+Processing: run_46 (41/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_46/ahmed_46.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_46/boundary_46.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_46/boundary_46.vtp
+  Coarse mesh: 113975 cells, 117627 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 113975 cells
+  Coarse surface fields shape: (113975, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_46/boundary_46.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_46/boundary_46.vtp
+  Fine mesh: 1072194 cells, 1101032 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1072194 cells) to coarse mesh (113975 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (113975, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (113975, 4)
+Interpolated fine fields shape: (113975, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4553, std: 0.2828
+  Predictions - mean: 0.4597, std: 0.2893
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(113975, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.026373, min=-0.892080, max=0.479784
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.013544 N
+    Fine (Interp): 0.012886 N
+    Predicted:    0.013209 N
+    Coarse vs Fine error: 0.000658 N
+    Pred vs Fine error:   0.000323 N
+    Improvement: 51.0%
+  Lift Forces:
+    Coarse:       0.005589 N
+    Fine (Interp): 0.005257 N
+    Predicted:    0.003337 N
+    Coarse vs Fine error: 0.000333 N
+    Pred vs Fine error:   0.001920 N
+    Improvement: -477.3%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_46_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_46_comprehensive_comparison.vtp
+  All field arrays have 113975 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.012173
+    Predicted:       0.029392
+    Improvement:     -141.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000314
+    Predicted:       0.000619
+    Improvement:     -97.0%
+
+============================================================
+Processing: run_47 (42/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_47/ahmed_47.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_47/boundary_47.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_47/boundary_47.vtp
+  Coarse mesh: 96541 cells, 100342 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 96541 cells
+  Coarse surface fields shape: (96541, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_47/boundary_47.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_47/boundary_47.vtp
+  Fine mesh: 950301 cells, 976510 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (950301 cells) to coarse mesh (96541 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (96541, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (96541, 4)
+Interpolated fine fields shape: (96541, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4543, std: 0.2839
+  Predictions - mean: 0.4590, std: 0.2905
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(96541, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027573, min=-0.791446, max=0.479688
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.013881 N
+    Fine (Interp): 0.015975 N
+    Predicted:    0.015347 N
+    Coarse vs Fine error: 0.002094 N
+    Pred vs Fine error:   0.000628 N
+    Improvement: 70.0%
+  Lift Forces:
+    Coarse:       -0.002837 N
+    Fine (Interp): -0.000119 N
+    Predicted:    0.000917 N
+    Coarse vs Fine error: 0.002718 N
+    Pred vs Fine error:   0.001036 N
+    Improvement: 61.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_47_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_47_comprehensive_comparison.vtp
+  All field arrays have 96541 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.015163
+    Predicted:       0.026060
+    Improvement:     -71.9%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000300
+    Predicted:       0.000654
+    Improvement:     -118.2%
+
+============================================================
+Processing: run_48 (43/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_48/ahmed_48.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_48/boundary_48.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_48/boundary_48.vtp
+  Coarse mesh: 87192 cells, 91210 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 87192 cells
+  Coarse surface fields shape: (87192, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_48/boundary_48.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_48/boundary_48.vtp
+  Fine mesh: 796048 cells, 818693 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (796048 cells) to coarse mesh (87192 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (87192, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (87192, 4)
+Interpolated fine fields shape: (87192, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4553, std: 0.2834
+  Predictions - mean: 0.4598, std: 0.2904
+Prediction completed in 0.14 seconds
+After removing batch dim: shape=(87192, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.026823, min=-0.736907, max=0.481026
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.011849 N
+    Fine (Interp): 0.012734 N
+    Predicted:    0.012971 N
+    Coarse vs Fine error: 0.000885 N
+    Pred vs Fine error:   0.000237 N
+    Improvement: 73.3%
+  Lift Forces:
+    Coarse:       -0.002084 N
+    Fine (Interp): -0.000740 N
+    Predicted:    0.000261 N
+    Coarse vs Fine error: 0.001344 N
+    Pred vs Fine error:   0.001001 N
+    Improvement: 25.5%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_48_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_48_comprehensive_comparison.vtp
+  All field arrays have 87192 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.012129
+    Predicted:       0.024939
+    Improvement:     -105.6%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000307
+    Predicted:       0.000693
+    Improvement:     -125.4%
+
+============================================================
+Processing: run_49 (44/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_49/ahmed_49.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_49/boundary_49.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_49/boundary_49.vtp
+  Coarse mesh: 104372 cells, 108537 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 104372 cells
+  Coarse surface fields shape: (104372, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_49/boundary_49.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_49/boundary_49.vtp
+  Fine mesh: 975802 cells, 1002112 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (975802 cells) to coarse mesh (104372 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (104372, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (104372, 4)
+Interpolated fine fields shape: (104372, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4557, std: 0.2841
+  Predictions - mean: 0.4594, std: 0.2908
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(104372, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027813, min=-0.831182, max=0.483972
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.014100 N
+    Fine (Interp): 0.015413 N
+    Predicted:    0.015481 N
+    Coarse vs Fine error: 0.001312 N
+    Pred vs Fine error:   0.000069 N
+    Improvement: 94.7%
+  Lift Forces:
+    Coarse:       -0.006002 N
+    Fine (Interp): -0.002288 N
+    Predicted:    -0.000834 N
+    Coarse vs Fine error: 0.003715 N
+    Pred vs Fine error:   0.001454 N
+    Improvement: 60.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_49_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_49_comprehensive_comparison.vtp
+  All field arrays have 104372 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.020937
+    Predicted:       0.026620
+    Improvement:     -27.1%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000313
+    Predicted:       0.000704
+    Improvement:     -125.1%
+
+============================================================
+Processing: run_5 (45/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_5/ahmed_5.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_5/boundary_5.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_5/boundary_5.vtp
+  Coarse mesh: 95300 cells, 99363 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 95300 cells
+  Coarse surface fields shape: (95300, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_5/boundary_5.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_5/boundary_5.vtp
+  Fine mesh: 851246 cells, 874742 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (851246 cells) to coarse mesh (95300 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (95300, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (95300, 4)
+Interpolated fine fields shape: (95300, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4554, std: 0.2836
+  Predictions - mean: 0.4596, std: 0.2904
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(95300, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.027240, min=-0.708060, max=0.483476
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.012826 N
+    Fine (Interp): 0.014278 N
+    Predicted:    0.014479 N
+    Coarse vs Fine error: 0.001452 N
+    Pred vs Fine error:   0.000201 N
+    Improvement: 86.2%
+  Lift Forces:
+    Coarse:       -0.004351 N
+    Fine (Interp): -0.001898 N
+    Predicted:    -0.000045 N
+    Coarse vs Fine error: 0.002453 N
+    Pred vs Fine error:   0.001852 N
+    Improvement: 24.5%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_5_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_5_comprehensive_comparison.vtp
+  All field arrays have 95300 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.017947
+    Predicted:       0.025452
+    Improvement:     -41.8%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000298
+    Predicted:       0.000701
+    Improvement:     -134.8%
+
+============================================================
+Processing: run_50 (46/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_50/ahmed_50.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_50/boundary_50.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_50/boundary_50.vtp
+  Coarse mesh: 128203 cells, 132189 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 128203 cells
+  Coarse surface fields shape: (128203, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_50/boundary_50.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_50/boundary_50.vtp
+  Fine mesh: 1377334 cells, 1412811 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1377334 cells) to coarse mesh (128203 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (128203, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (128203, 4)
+Interpolated fine fields shape: (128203, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4537, std: 0.2849
+  Predictions - mean: 0.4584, std: 0.2912
+Prediction completed in 0.17 seconds
+After removing batch dim: shape=(128203, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.028783, min=-0.953382, max=0.481594
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.017152 N
+    Fine (Interp): 0.016567 N
+    Predicted:    0.016774 N
+    Coarse vs Fine error: 0.000585 N
+    Pred vs Fine error:   0.000207 N
+    Improvement: 64.6%
+  Lift Forces:
+    Coarse:       0.000736 N
+    Fine (Interp): 0.000318 N
+    Predicted:    -0.001310 N
+    Coarse vs Fine error: 0.000418 N
+    Pred vs Fine error:   0.001628 N
+    Improvement: -289.9%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_50_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_50_comprehensive_comparison.vtp
+  All field arrays have 128203 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.012703
+    Predicted:       0.027874
+    Improvement:     -119.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000325
+    Predicted:       0.000626
+    Improvement:     -92.8%
+
+============================================================
+Processing: run_6 (47/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_6/ahmed_6.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_6/boundary_6.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_6/boundary_6.vtp
+  Coarse mesh: 101628 cells, 106011 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 101628 cells
+  Coarse surface fields shape: (101628, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_6/boundary_6.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_6/boundary_6.vtp
+  Fine mesh: 887889 cells, 912689 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (887889 cells) to coarse mesh (101628 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (101628, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (101628, 4)
+Interpolated fine fields shape: (101628, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4468, std: 0.2838
+  Predictions - mean: 0.4491, std: 0.2931
+Prediction completed in 0.15 seconds
+After removing batch dim: shape=(101628, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.038930, min=-1.180507, max=0.484724
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.019123 N
+    Fine (Interp): 0.020161 N
+    Predicted:    0.019464 N
+    Coarse vs Fine error: 0.001038 N
+    Pred vs Fine error:   0.000697 N
+    Improvement: 32.9%
+  Lift Forces:
+    Coarse:       0.014538 N
+    Fine (Interp): 0.027372 N
+    Predicted:    0.024906 N
+    Coarse vs Fine error: 0.012834 N
+    Pred vs Fine error:   0.002467 N
+    Improvement: 80.8%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_6_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_6_comprehensive_comparison.vtp
+  All field arrays have 101628 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.086793
+    Predicted:       0.052627
+    Improvement:     39.4%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000533
+    Predicted:       0.000729
+    Improvement:     -36.8%
+
+============================================================
+Processing: run_7 (48/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_7/ahmed_7.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_7/boundary_7.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_7/boundary_7.vtp
+  Coarse mesh: 107870 cells, 111847 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 107870 cells
+  Coarse surface fields shape: (107870, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_7/boundary_7.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_7/boundary_7.vtp
+  Fine mesh: 1117096 cells, 1147468 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1117096 cells) to coarse mesh (107870 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (107870, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (107870, 4)
+Interpolated fine fields shape: (107870, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4516, std: 0.2857
+  Predictions - mean: 0.4564, std: 0.2920
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(107870, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.031001, min=-0.895400, max=0.480518
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.018279 N
+    Fine (Interp): 0.018715 N
+    Predicted:    0.019238 N
+    Coarse vs Fine error: 0.000436 N
+    Pred vs Fine error:   0.000523 N
+    Improvement: -19.8%
+  Lift Forces:
+    Coarse:       -0.005704 N
+    Fine (Interp): -0.003320 N
+    Predicted:    -0.002620 N
+    Coarse vs Fine error: 0.002384 N
+    Pred vs Fine error:   0.000700 N
+    Improvement: 70.6%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_7_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_7_comprehensive_comparison.vtp
+  All field arrays have 107870 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.016149
+    Predicted:       0.028939
+    Improvement:     -79.2%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000330
+    Predicted:       0.000668
+    Improvement:     -102.5%
+
+============================================================
+Processing: run_8 (49/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_8/ahmed_8.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_8/boundary_8.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_8/boundary_8.vtp
+  Coarse mesh: 136409 cells, 140639 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 136409 cells
+  Coarse surface fields shape: (136409, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_8/boundary_8.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_8/boundary_8.vtp
+  Fine mesh: 1415730 cells, 1452569 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1415730 cells) to coarse mesh (136409 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (136409, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (136409, 4)
+Interpolated fine fields shape: (136409, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4523, std: 0.2856
+  Predictions - mean: 0.4556, std: 0.2917
+Prediction completed in 0.18 seconds
+After removing batch dim: shape=(136409, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.031940, min=-0.989611, max=0.480046
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.021537 N
+    Fine (Interp): 0.020634 N
+    Predicted:    0.020237 N
+    Coarse vs Fine error: 0.000903 N
+    Pred vs Fine error:   0.000397 N
+    Improvement: 56.1%
+  Lift Forces:
+    Coarse:       0.005447 N
+    Fine (Interp): 0.021288 N
+    Predicted:    0.017564 N
+    Coarse vs Fine error: 0.015840 N
+    Pred vs Fine error:   0.003723 N
+    Improvement: 76.5%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_8_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_8_comprehensive_comparison.vtp
+  All field arrays have 136409 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.037982
+    Predicted:       0.036044
+    Improvement:     5.1%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000441
+    Predicted:       0.000656
+    Improvement:     -48.7%
+
+============================================================
+Processing: run_9 (50/50)
+============================================================
+Loading geometry: /data/ahmed_data/organized/test_on_train/coarse/run_9/ahmed_9.stl
+Loading coarse surface data: /data/ahmed_data/organized/test_on_train/coarse/run_9/boundary_9.vtp
+Loading coarse data: /data/ahmed_data/organized/test_on_train/coarse/run_9/boundary_9.vtp
+  Coarse mesh: 119008 cells, 123464 points
+  Cell data keys: []
+  Point data keys: ['k', 'p', 'static(p)_coeff', 'total(p)_coeff', 'yPlus', 'wallShearStress']
+  Converting p from point data to cell data...
+    Manual conversion: p (1 components)
+  Converting wallShearStress from point data to cell data...
+    Manual conversion: wallShearStress (3 components)
+  ✅ Loaded 119008 cells
+  Coarse surface fields shape: (119008, 4)
+    pMean -> p (point->cell manual)
+    wallShearStressMean -> wallShearStress (point->cell manual)
+Loading and interpolating fine surface data: /data/ahmed_data/organized/test_on_train/fine/run_9/boundary_9.vtp
+Loading fine ground truth data: /data/ahmed_data/organized/test_on_train/fine/run_9/boundary_9.vtp
+  Fine mesh: 1185336 cells, 1217215 points
+  Cell data keys: ['pMean', 'static(p)_coeffMean', 'yPlusMean', 'wallShearStressMean']
+  Point data keys: []
+  Interpolating fine data (1185336 cells) to coarse mesh (119008 cells)
+  ✅ Interpolation complete
+  ✅ Interpolated fine data to target mesh
+  Interpolated fields shape: (119008, 4)
+    pMean -> pMean (cell data)
+    wallShearStressMean -> wallShearStressMean (cell data)
+Input surface fields shape: (119008, 4)
+Interpolated fine fields shape: (119008, 4)
+  (Both should have same number of cells now)
+Running enhanced model prediction...
+
+[Inference Mode]
+  Coarse features (input) - mean: 0.4525, std: 0.2849
+  Predictions - mean: 0.4570, std: 0.2913
+Prediction completed in 0.16 seconds
+After removing batch dim: shape=(119008, 4), type=<class 'numpy.ndarray'>
+Prediction stats: mean=-0.030607, min=-0.898068, max=0.478184
+
+Force Comparison:
+  Drag Forces:
+    Coarse:       0.018708 N
+    Fine (Interp): 0.019739 N
+    Predicted:    0.020159 N
+    Coarse vs Fine error: 0.001030 N
+    Pred vs Fine error:   0.000420 N
+    Improvement: 59.2%
+  Lift Forces:
+    Coarse:       -0.010736 N
+    Fine (Interp): -0.009229 N
+    Predicted:    -0.003435 N
+    Coarse vs Fine error: 0.001507 N
+    Pred vs Fine error:   0.005794 N
+    Improvement: -284.6%
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_9_comprehensive_comparison.vtp
+Saving comprehensive VTP: /data/ahmed_data/predictions_fixed/train_50/boundary_9_comprehensive_comparison.vtp
+  All field arrays have 119008 cells - dimensions match ✅
+  ✅ Saved comprehensive VTP with 12 field arrays
+  Field arrays:
+    - Coarse_Pressure
+    - Coarse_WallShearStress
+    - Fine_Pressure_GroundTruth_Interpolated
+    - Fine_WallShearStress_GroundTruth_Interpolated
+    - Predicted_Pressure
+    - Predicted_WallShearStress
+    - Error_Pressure_vs_Fine
+    - Error_WallShearStress_vs_Fine
+    - Error_Coarse_vs_Fine
+    - Error_CoarseShear_vs_Fine
+    - RelativeError_Pressure_Percent
+    - RelativeError_WallShearStress_Percent
+
+Field Quality Metrics:
+  Pressure RMSE:
+    Coarse baseline: 0.015273
+    Predicted:       0.026964
+    Improvement:     -76.5%
+  Wall Shear RMSE:
+    Coarse baseline: 0.000312
+    Predicted:       0.000657
+    Improvement:     -110.5%
+
+================================================================================
+ENHANCED MODEL TESTING COMPLETED - COMPREHENSIVE COMPARISON
+================================================================================
+Successfully processed: 50/5 test cases
+
+Force Predictions Comprehensive Summary:
+Case     Coarse Drag  Fine Drag    Pred Drag    Improvement 
+         Coarse Lift  Fine Lift    Pred Lift    Improvement 
+--------------------------------------------------------------------------------
+run_1    0.012532     0.013345     0.014042     14.3        %
+         -0.005954    -0.005284    -0.001364    -484.7      %
+
+run_10   0.011677     0.010558     0.011186     43.9        %
+         0.009211     0.008197     0.006852     -32.7       %
+
+run_11   0.016981     0.018360     0.018831     65.8        %
+         -0.007957    -0.006651    -0.002890    -187.9      %
+
+run_12   0.019037     0.021419     0.020411     57.7        %
+         0.007781     0.022281     0.017994     70.4        %
+
+run_13   0.022250     0.020044     0.020186     93.6        %
+         0.018448     0.023413     0.020784     47.1        %
+
+run_14   0.018939     0.019751     0.018961     2.7         %
+         0.017793     0.026128     0.020661     34.4        %
+
+run_15   0.016368     0.016589     0.016754     25.2        %
+         -0.007645    -0.005420    -0.003639    20.0        %
+
+run_16   0.014161     0.015494     0.015950     65.8        %
+         -0.004569    -0.001691    0.000814     12.9        %
+
+run_17   0.016346     0.016582     0.017400     -245.3      %
+         -0.010157    -0.009807    -0.006043    -975.3      %
+
+run_18   0.022543     0.021798     0.021722     89.9        %
+         0.020158     0.028101     0.027025     86.5        %
+
+run_19   0.016565     0.016954     0.017306     9.7         %
+         -0.008034    -0.006844    -0.003996    -139.3      %
+
+run_2    0.017949     0.017114     0.017419     63.5        %
+         0.008714     0.008695     0.006956     -9054.4     %
+
+run_20   0.012190     0.012030     0.012135     34.4        %
+         0.002502     0.011357     0.010225     87.2        %
+
+run_21   0.016732     0.013793     0.013535     91.2        %
+         0.016430     0.016400     0.016894     -1545.7     %
+
+run_22   0.017396     0.018435     0.019157     30.5        %
+         -0.004552    0.000105     0.001387     72.5        %
+
+run_23   0.019076     0.020122     0.020359     77.3        %
+         0.004539     0.026760     0.022905     82.6        %
+
+run_24   0.014774     0.016298     0.016667     75.8        %
+         -0.003986    -0.000946    0.001749     11.4        %
+
+run_25   0.016330     0.016624     0.016829     30.6        %
+         -0.000230    -0.000161    0.000387     -702.7      %
+
+run_26   0.015229     0.022903     0.021012     75.4        %
+         -0.002768    0.023046     0.022156     96.6        %
+
+run_27   0.012910     0.012766     0.012501     -83.2       %
+         0.002042     0.003049     0.001803     -23.8       %
+
+run_28   0.013402     0.013763     0.014194     -18.9       %
+         -0.004315    -0.002840    0.000353     -116.6      %
+
+run_29   0.015523     0.015135     0.016406     -227.5      %
+         -0.006673    -0.005484    -0.002876    -119.4      %
+
+run_3    0.014137     0.013480     0.012856     5.0         %
+         0.008661     0.012679     0.009512     21.2        %
+
+run_30   0.013834     0.014995     0.014944     95.5        %
+         -0.004832    -0.003360    -0.001104    -53.3       %
+
+run_31   0.015502     0.016182     0.016995     -19.7       %
+         -0.007945    -0.006062    -0.002506    -88.9       %
+
+run_32   0.012408     0.013227     0.013924     15.0        %
+         -0.000966    0.001557     0.001724     93.4        %
+
+run_33   0.011873     0.012568     0.013173     13.1        %
+         -0.002557    -0.000633    0.000331     49.9        %
+
+run_34   0.015352     0.024799     0.022537     76.1        %
+         -0.002731    0.026889     0.020417     78.2        %
+
+run_35   0.013079     0.013934     0.014367     49.3        %
+         -0.004160    -0.002290    -0.001308    47.5        %
+
+run_36   0.012018     0.011413     0.011122     51.9        %
+         0.006638     0.010783     0.010268     87.6        %
+
+run_37   0.017547     0.018889     0.018582     77.1        %
+         -0.004751    -0.001113    0.000428     57.6        %
+
+run_38   0.021215     0.021934     0.022312     47.4        %
+         -0.008226    -0.006887    -0.002931    -195.4      %
+
+run_39   0.016189     0.016551     0.017687     -213.3      %
+         -0.006161    -0.003091    -0.001654    53.2        %
+
+run_4    0.018551     0.021341     0.020847     82.3        %
+         -0.004836    0.006470     0.005205     88.8        %
+
+run_40   0.014405     0.015736     0.015587     88.8        %
+         -0.002159    0.001872     0.002436     86.0        %
+
+run_41   0.024710     0.022041     0.022861     69.2        %
+         0.035513     0.033579     0.033536     97.8        %
+
+run_42   0.015014     0.014962     0.016233     -2356.2     %
+         -0.006610    -0.004312    -0.000934    -47.0       %
+
+run_43   0.011972     0.013186     0.013469     76.7        %
+         -0.003527    -0.001913    -0.000634    20.7        %
+
+run_44   0.013136     0.013476     0.013887     -20.7       %
+         -0.002228    -0.002135    -0.000422    -1744.9     %
+
+run_45   0.012358     0.012764     0.013196     -6.5        %
+         -0.002694    -0.001649    -0.000261    -32.9       %
+
+run_46   0.013544     0.012886     0.013209     51.0        %
+         0.005589     0.005257     0.003337     -477.3      %
+
+run_47   0.013881     0.015975     0.015347     70.0        %
+         -0.002837    -0.000119    0.000917     61.9        %
+
+run_48   0.011849     0.012734     0.012971     73.3        %
+         -0.002084    -0.000740    0.000261     25.5        %
+
+run_49   0.014100     0.015413     0.015481     94.7        %
+         -0.006002    -0.002288    -0.000834    60.9        %
+
+run_5    0.012826     0.014278     0.014479     86.2        %
+         -0.004351    -0.001898    -0.000045    24.5        %
+
+run_50   0.017152     0.016567     0.016774     64.6        %
+         0.000736     0.000318     -0.001310    -289.9      %
+
+run_6    0.019123     0.020161     0.019464     32.9        %
+         0.014538     0.027372     0.024906     80.8        %
+
+run_7    0.018279     0.018715     0.019238     -19.8       %
+         -0.005704    -0.003320    -0.002620    70.6        %
+
+run_8    0.021537     0.020634     0.020237     56.1        %
+         0.005447     0.021288     0.017564     76.5        %
+
+run_9    0.018708     0.019739     0.020159     59.2        %
+         -0.010736    -0.009229    -0.003435    -284.6      %
+
+
+📊 OVERALL PERFORMANCE:
+  Average drag prediction improvement over coarse: -18.6%
+  Average lift prediction improvement over coarse: -295.9%
+
+🎉 Enhanced DoMINO comprehensive testing completed successfully!
+
+📁 Output VTP files contain:
+  - Coarse_Pressure & Coarse_WallShearStress (input)
+  - Fine_Pressure_GroundTruth_Interpolated & Fine_WallShearStress_GroundTruth_Interpolated
+  - Predicted_Pressure & Predicted_WallShearStress
+  - Error_Pressure_vs_Fine & Error_WallShearStress_vs_Fine
+  - Error_Coarse_vs_Fine & Error_CoarseShear_vs_Fine (baseline errors)
+  - RelativeError_Pressure_Percent & RelativeError_WallShearStress_Percent
+
+💡 In ParaView:
+  1. Load the VTP files from: /data/ahmed_data/predictions_fixed/train_50
+  2. Use 'Coarse_*' fields to see input data
+  3. Use 'Fine_*_GroundTruth_Interpolated' fields to see target data
+  4. Use 'Predicted_*' fields to see model predictions
+  5. Use 'Error_*_vs_Fine' fields to see prediction errors
+  6. Use 'Error_Coarse_vs_Fine' fields to see baseline errors
+  7. Color by different fields to compare visually
+
+🔧 Key Fix Applied:
+  ✅ Fine mesh data interpolated to coarse mesh coordinates
+  ✅ All field arrays now have matching dimensions
+  ✅ Proper error calculation and improvement metrics

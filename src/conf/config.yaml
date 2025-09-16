@@ -37,13 +37,16 @@ domain_parallelism:
   shard_grid: false
   shard_points: false
 eval:
-  checkpoint_name: DoMINOEnhanced.0.299.pt
+  checkpoint_name: Enhanced_epoch_500.pt
   coarse_test_path: /data/ahmed_data/organized/test/coarse/
+  #coarse_test_path: /data/ahmed_data/organized/test_on_train/coarse/
   refine_stl: false
-  save_path: /data/ahmed_data/predictions_fixed/
+  save_path: /data/ahmed_data/predictions_fixed/test_500
+  #save_path: /data/ahmed_data/predictions_fixed/train_500
   scaling_param_path: outputs/Ahmed_Dataset
   stencil_size: 7
   test_path: /data/ahmed_data/organized/test/fine/
+  #test_path: /data/ahmed_data/organized/test_on_train/fine/
 exp_tag: '111'
 hydra:
   output_subdir: hydra
@@ -153,12 +156,12 @@ project:
 project_dir: outputs/${project.name}/
 resume_dir: ${output}/models
 train:
-  checkpoint_dir: null
+  checkpoint_dir: outputs/Ahmed_Dataset/111/models
   checkpoint_interval: 25
   dataloader:
     batch_size: 1
     pin_memory: false
-  epochs: 300
+  epochs: 1000
   sampler:
     drop_last: false
     shuffle: true

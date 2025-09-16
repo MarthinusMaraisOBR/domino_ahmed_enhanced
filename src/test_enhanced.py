@@ -590,9 +590,9 @@ def main(cfg: DictConfig):
     # Process each test case
     results_summary = []
     
-    for count, dirname in enumerate(coarse_test_cases[:5]):  # Test first 5 cases
+    for count, dirname in enumerate(coarse_test_cases):  # Test first 5 cases
         print(f"\n{'='*60}")
-        print(f"Processing: {dirname} ({count+1}/5)")
+        print(f"Processing: {dirname} ({count+1}/{len(coarse_test_cases)})")
         print(f"{'='*60}")
         
         tag = int(re.findall(r"(\w+?)(\d+)", dirname)[0][1])
